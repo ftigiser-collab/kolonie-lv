@@ -155,33 +155,55 @@ export function drawPanzerwagen(ctx, col, face, t) {
   ctx.fillStyle = `rgba(90,255,150,${0.5 + 0.5 * Math.sin(t * 6)})`; ell(ctx, -7, 0, 1.3, 1.3); ctx.fill();
   ctx.restore();
 }
-export function drawSchiff(ctx, col, face, t, flying) {
+export function drawSchiff(ctx, col, face, t, flying, alt = null) {
+  // eigenes Design: schwerer Senkrechtstarter mit vier Mantelschrauben, Heckrampe, Waffenträgern
+  const h = alt == null ? (flying ? 1 : 0) : alt;
   ctx.save();
-  const h = flying ? 14 : 2;
-  ctx.save(); ctx.translate(h * 0.9, h * 1.3); ctx.rotate(face); ctx.globalAlpha = flying ? 0.35 : 0.5; ctx.fillStyle = '#000';
-  shipShape(ctx); ctx.fill(); ctx.restore();
-  ctx.rotate(face);
-  if (flying) { const g = ctx.createRadialGradient(-20, 0, 0, -20, 0, 14); g.addColorStop(0, 'rgba(130,200,255,0.85)'); g.addColorStop(1, 'rgba(60,120,255,0)'); ctx.fillStyle = g; ell(ctx, -22, -9, 10, 5); ctx.fill(); ell(ctx, -22, 9, 10, 5); ctx.fill(); }
-  ctx.fillStyle = '#4a5560'; shipShape(ctx); ctx.fill();
-  ctx.fillStyle = '#5e6a75'; ctx.beginPath(); ctx.moveTo(-14, -4); ctx.lineTo(18, -3); ctx.lineTo(24, 0); ctx.lineTo(18, 3); ctx.lineTo(-14, 4); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#2a3036'; rr(ctx, -20, -13, 9, 6, 2); ctx.fill(); rr(ctx, -20, 7, 9, 6, 2); ctx.fill();
-  ctx.fillStyle = '#3a4248'; for (const sd of [-1, 1]) { rr(ctx, 0, sd * 9 - 1.5, 9, 3, 1.2); ctx.fill(); }
-  ctx.fillStyle = '#20262a'; for (const sd of [-1, 1]) for (let i = 0; i < 3; i++) { ell(ctx, 9.2, sd * 9 - 1 + i, 0.5, 0.4); ctx.fill(); }
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(-3, -16); ctx.lineTo(-8, -16); ctx.moveTo(-3, 16); ctx.lineTo(-8, 16); ctx.moveTo(8, -4); ctx.lineTo(8, 4); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.moveTo(-14, -4); ctx.lineTo(16, -3); ctx.lineTo(16, -1.5); ctx.lineTo(-14, -2.5); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = col; ctx.fillRect(-6, -14, 3, 5); ctx.fillRect(-6, 9, 3, 5);
-  ctx.fillStyle = 'rgba(140,200,230,0.85)'; ctx.beginPath(); ctx.moveTo(15, -2.4); ctx.lineTo(21.5, 0); ctx.lineTo(15, 2.4); ctx.closePath(); ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-10, -4); ctx.lineTo(-10, 4); ctx.moveTo(4, -3.5); ctx.lineTo(4, 3.5); ctx.stroke();
-  const blink = (Math.sin(t * 4) > 0.6);
-  ctx.fillStyle = blink ? '#ff4a3a' : '#5a1a14'; ell(ctx, -4, -21, 1.3, 1.3); ctx.fill();
-  ctx.fillStyle = blink ? '#5aff7a' : '#1a4a24'; ell(ctx, -4, 21, 1.3, 1.3); ctx.fill();
-  if (!flying) { ctx.fillStyle = 'rgba(255,220,120,0.35)'; ctx.fillRect(-18, -2, 5, 4); }
+  const off = 3 + h * 18, sc = 1 + h * 0.12;
+  ctx.save(); ctx.translate(off * 0.8, off * 1.2); ctx.rotate(face); ctx.scale(sc, sc); ctx.globalAlpha = 0.5 - h * 0.2; ctx.fillStyle = '#000';
+  rr(ctx, -22, -8, 44, 16, 4); ctx.fill(); for (const [x, y] of [[14, -14], [14, 14], [-14, -14], [-14, 14]]) { ell(ctx, x, y, 7, 7); ctx.fill(); }
   ctx.restore();
-}
-function shipShape(ctx) {
-  ctx.beginPath();
-  ctx.moveTo(24, 0); ctx.lineTo(16, -5); ctx.lineTo(2, -6); ctx.lineTo(-4, -22); ctx.lineTo(-10, -22); ctx.lineTo(-12, -7); ctx.lineTo(-22, -6);
-  ctx.lineTo(-22, 6); ctx.lineTo(-12, 7); ctx.lineTo(-10, 22); ctx.lineTo(-4, 22); ctx.lineTo(2, 6); ctx.lineTo(16, 5); ctx.closePath();
+  ctx.rotate(face); ctx.scale(sc, sc);
+  // Ausleger zu den Triebwerken
+  ctx.fillStyle = '#3a4248';
+  for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(12, sd * 6); ctx.lineTo(16, sd * 10); ctx.lineTo(12, sd * 10); ctx.lineTo(8, sd * 6); ctx.fill(); ctx.beginPath(); ctx.moveTo(-10, sd * 6); ctx.lineTo(-12, sd * 10); ctx.lineTo(-16, sd * 10); ctx.lineTo(-14, sd * 6); ctx.fill(); }
+  // Rumpf
+  const g = ctx.createLinearGradient(0, -9, 0, 9); g.addColorStop(0, '#6c7780'); g.addColorStop(0.5, '#4c565e'); g.addColorStop(1, '#2e353b');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(24, -3); ctx.lineTo(19, -8); ctx.lineTo(-20, -8); ctx.lineTo(-23, -5); ctx.lineTo(-23, 5); ctx.lineTo(-20, 8); ctx.lineTo(19, 8); ctx.lineTo(24, 3); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.7;
+  ctx.beginPath(); for (const x of [-14, -6, 2, 10]) { ctx.moveTo(x, -8); ctx.lineTo(x, 8); } ctx.moveTo(-20, 0); ctx.lineTo(14, 0); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(-20, -8, 39, 2.2);
+  // Heckrampe
+  ctx.fillStyle = '#2a3036'; rr(ctx, -23, -5, 4, 10, 1); ctx.fill();
+  ctx.strokeStyle = 'rgba(232,179,32,0.6)'; ctx.setLineDash([1.5, 1.5]); ctx.beginPath(); ctx.moveTo(-21, -5); ctx.lineTo(-21, 5); ctx.stroke(); ctx.setLineDash([]);
+  // Cockpit
+  ctx.fillStyle = 'rgba(120,180,210,0.85)'; ctx.beginPath(); ctx.moveTo(23, -2.5); ctx.lineTo(18.5, -6); ctx.lineTo(15, -5.5); ctx.lineTo(15, 5.5); ctx.lineTo(18.5, 6); ctx.lineTo(23, 2.5); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(20,30,40,0.8)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(18.5, -6); ctx.lineTo(18.5, 6); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.moveTo(22, -2); ctx.lineTo(19, -4.5); ctx.lineTo(19, -2); ctx.closePath(); ctx.fill();
+  // Kennung
+  ctx.fillStyle = col; ctx.fillRect(-4, -8, 5, 2.4); ctx.fillRect(-4, 5.6, 5, 2.4);
+  // Waffenträger mit Raketenbehältern
+  for (const sd of [-1, 1]) { ctx.fillStyle = '#262c30'; rr(ctx, 0, sd * 9 - 2, 9, 4, 1); ctx.fill(); ctx.fillStyle = '#121518'; for (let i = 0; i < 3; i++) { ell(ctx, 9, sd * 9 - 1.2 + i * 1.2, 0.45, 0.45); ctx.fill(); } }
+  // Kinngeschütz
+  ctx.fillStyle = '#1e2226'; ell(ctx, 21, 0, 2, 2); ctx.fill(); ctx.strokeStyle = '#1e2226'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(21, 0); ctx.lineTo(27, 0); ctx.stroke();
+  // vier Mantelschrauben
+  for (const [x, y] of [[14, -14], [14, 14], [-14, -14], [-14, 14]]) {
+    const rg = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, 7.5); rg.addColorStop(0, '#5a646c'); rg.addColorStop(1, '#262c30');
+    ctx.fillStyle = rg; ell(ctx, x, y, 7, 7); ctx.fill();
+    ctx.fillStyle = '#0e1012'; ell(ctx, x, y, 5.2, 5.2); ctx.fill();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(t * (h > 0.05 ? 40 : 2) + x);
+    ctx.fillStyle = h > 0.05 ? 'rgba(160,170,180,0.35)' : '#4a5258';
+    for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.fillRect(-0.8, 0, 1.6, 5); }
+    ctx.restore();
+    if (h > 0.05) { const gl = ctx.createRadialGradient(x, y, 0, x, y, 9); gl.addColorStop(0, `rgba(140,200,255,${0.35 * h})`); gl.addColorStop(1, 'rgba(80,140,255,0)'); ctx.fillStyle = gl; ell(ctx, x, y, 9, 9); ctx.fill(); }
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ell(ctx, x, y, 1.4, 1.4); ctx.fill();
+  }
+  // Positionslichter
+  const blink = Math.sin(t * 4) > 0.6;
+  ctx.fillStyle = blink ? '#ff4a3a' : '#5a1a14'; ell(ctx, -14, -21, 1.3, 1.3); ctx.fill();
+  ctx.fillStyle = blink ? '#5aff7a' : '#1a4a24'; ell(ctx, -14, 21, 1.3, 1.3); ctx.fill();
+  if (blink) { ctx.fillStyle = 'rgba(255,255,255,0.9)'; ell(ctx, -23, 0, 1, 1); ctx.fill(); }
+  ctx.restore();
 }
 
 // ---------- Die Brut (eigenes Design: ausgemergelte, nass glänzende Lauerer mit Blütenkiefer) ----------

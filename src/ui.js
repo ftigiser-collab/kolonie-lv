@@ -167,6 +167,13 @@ export class Controller {
       case 'hatch': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.ring(p.x, p.y, '#a98cff', 0.8, 30); } break;
       case 'contact': { const p = center(e.c, e.r); r.ring(p.x, p.y, '#ff4a3a', 0.8, 36); r.shake = 4; await sleep(250); break; }
       case 'banner': await this.banner(e.text, e.sub, 1.5); break;
+      case 'dropin': case 'shipin': {
+        const us = e.ids.map((id) => g.units.find((x) => x.id === id)).filter(Boolean);
+        if (!us.length || (e.owner !== 0 && !this.seenHex(e.c, e.r))) break;
+        await this.dropFlight(us, e.c, e.r, e.owner, e.type === 'shipin');
+        break;
+      }
+      case 'dropout': if (e.owner === 0 || this.seenHex(e.c, e.r)) await this.dropFlight([], e.c, e.r, e.owner, false); break;
       case 'scan': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.ring(p.x, p.y, '#9fd8ff', 0.9, 30); await sleep(250 / sp); } break;
       case 'defect': {
         const p = center(e.c, e.r);
@@ -195,6 +202,50 @@ export class Controller {
         break;
       }
     }
+  }
+
+  // Lieferflug: Landungsschiff fliegt ein, setzt ab, fliegt wieder ab
+  async dropFlight(us, c, r, owner, isShip) {
+    const g = this.g, R = this.r, sp = this.aiSpeed();
+    const land = center(c, r), dir = g.map.lz.c > g.W / 2 ? 1 : -1;
+    const start = { x: land.x + dir * 1200, y: land.y - 320 }, exit = { x: land.x + dir * 1300, y: land.y + 260 };
+    if (owner === 0 || this.seenHex(c, r)) await this.ensureVisible(land.x, land.y);
+    for (const x of us) x.animHide = true;
+    const col = FACTIONS[g.fac(owner)].color;
+    const gs = { x: start.x, y: start.y, face: Math.atan2(land.y - start.y, land.x - start.x), alt: 1, col };
+    R.ghosts.push(gs);
+    const ease = (k) => 1 - (1 - k) ** 3;
+    await this.tween(1.3 / sp, (k) => { const e = ease(k); gs.x = start.x + (land.x - start.x) * e; gs.y = start.y + (land.y - start.y) * e; gs.alt = isShip ? 1 : k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45; });
+    if (isShip) {
+      R.ghosts = R.ghosts.filter((x) => x !== gs);
+      for (const x of us) { x.animHide = false; x.face = gs.face; x.dface = gs.face; }
+      return;
+    }
+    R.burst(land.x, land.y, '#9a8a7a', 30, 90, 0.9, 4); R.ring(land.x, land.y, '#c8b898', 0.6, 40); R.shake = Math.max(R.shake, 3);
+    for (const x of us) { x.animHide = false; x.fade = 0; }
+    await this.tween(0.35 / sp, (k) => { for (const x of us) x.fade = k; });
+    for (const x of us) x.fade = null;
+    await sleep(150 / sp);
+    const from = { x: gs.x, y: gs.y };
+    await this.tween(1.1 / sp, (k) => { gs.alt = Math.min(1, k * 2.5); const e = k * k; gs.x = from.x + (exit.x - from.x) * e; gs.y = from.y + (exit.y - from.y) * e; gs.face = Math.atan2(exit.y - from.y, exit.x - from.x) * Math.min(1, k * 3) + gs.face * (1 - Math.min(1, k * 3)); });
+    R.ghosts = R.ghosts.filter((x) => x !== gs);
+  }
+  async playIntro() {
+    const g = this.g;
+    if (g.fac(0) !== 'marines') return;
+    this.busy = true;
+    const ms = g.units.filter((x) => x.owner === 0);
+    for (const x of ms) x.animHide = true;
+    const L = g.map.lz, p = center(L.c, L.r);
+    this.r.centerOn(p.x, p.y, false);
+    const groups = [ms.slice(0, 3), ms.slice(3)];
+    for (const grp of groups) {
+      if (!grp.length) continue;
+      const cc = Math.round(grp.reduce((s, x) => s + x.c, 0) / grp.length), rr = Math.round(grp.reduce((s, x) => s + x.r, 0) / grp.length);
+      await this.dropFlight(grp, cc, rr, 0, false);
+    }
+    this.busy = false;
+    this.refresh();
   }
 
   // ---------- Eingabe ----------
@@ -306,6 +357,7 @@ export class Controller {
     if (b && g.bVisibleTo(0, b)) { this.select(b); return; }
     const site = g.siteAt(c, r);
     this.deselect(false);
+    if (g.fac(0) === 'marines' && g.terr(c, r) === 'pad') { this.showShop(g.lzPoint); return; }
     if (site && g.explored[g.idx(c, r)]) this.showSite(site); else this.showTerrain(c, r);
   }
 
@@ -402,7 +454,6 @@ export class Controller {
     if (u.cargo.length && g.canUnload(u)) A.push({ id: 'unload', label: `⬇ Aussteigen (${u.cargo.length})`, fn: () => this.run(() => g.unloadAll(u)).then(() => this.select(u)) });
     if (u.type === 'schiff') {
       if (g.canLand(u)) A.push({ id: 'land', label: '🛬 Landen', tip: 'Beendet den Zug. Gelandet: aufnehmen, absetzen, Nachschub, Befall heilen.', fn: () => this.run(() => g.land(u)).then(() => this.select(u)) });
-      if (u.landed) A.push({ id: 'shop', label: `📦 Nachschub (${2 - (u.spawned || 0)}/2)`, fn: () => this.showShop(u) });
     }
     if (!u.acted && d.cls === 'inf') {
       const cars = g.units.filter((c) => c.owner === 0 && g.canBoard(u, c));
@@ -470,7 +521,7 @@ export class Controller {
     const g = this.g;
     if (sp.isBld) return this.select(sp);
     const el = $('#panel');
-    el.innerHTML = this.head('unit', sp.type, FACTIONS[g.fac(0)].color, 'Nachschub anfordern', 'Landet direkt neben dem Landungsschiff');
+    el.innerHTML = this.head('unit', 'schiff', FACTIONS[g.fac(0)].color, 'Landefeld · Nachschub', g.lzBlocked(0) ? 'Landefeld unter Feindkontakt — keine Landungen!' : 'Jede Anforderung kommt mit einem eigenen Lieferflug');
     this.appendShop(el, sp);
     this.paintIcons(el); el.classList.add('show');
     el.querySelector('[data-act="close"]').onclick = () => this.deselect();
@@ -478,15 +529,15 @@ export class Controller {
   appendShop(el, sp) {
     const g = this.g, p = g.players[0], f = g.fac(0), col = FACTIONS[f].color;
     const list = g.buyList(0, sp);
-    const left = sp.type === 'schiff' ? 2 - (sp.spawned || 0) : g.spawnLimit(sp) - (sp.spawned || 0);
+    const left = g.spawnLimit(sp) - (sp.spawned || 0);
     const cards = list.map((t) => {
       const d = UNITS[t], ok = this.myTurn() && g.canBuy(0, t, sp);
       let why = '';
-      if (!ok) why = p.credits < d.cost ? 'zu teuer' : t === 'schiff' ? 'max. 2' : left <= 0 ? 'Limit' : 'kein Platz';
+      if (!ok) why = p.credits < d.cost ? 'zu teuer' : t === 'schiff' ? (g.lzBlocked(0) ? 'Feind am LZ' : 'max. 2') : left <= 0 ? 'Limit' : sp.isLz && g.lzBlocked(0) ? 'Feind am LZ' : 'kein Platz';
       return `<button class="card ${ok ? '' : 'locked'}" data-u="${t}" ${ok ? '' : 'disabled'}><span class="small" data-ic="unit|${t}|${col}"></span><b>${d.name}</b><em>${d.cost}</em>${why ? `<i>${why}</i>` : ''}</button>`;
     }).join('');
     const box = document.createElement('div');
-    box.innerHTML = `<div class="p-title">Einheiten · noch ${Math.max(0, left)} diese Runde · ${FACTIONS[f].money} ${Math.floor(p.credits)}</div><div class="cards">${cards}</div><div class="p-desc" id="sdesc">Neue Einheiten sind ab der nächsten Runde einsatzbereit.${list.includes('schiff') ? ' Ein neues Landungsschiff kommt am Landefeld an.' : ''}</div>`;
+    box.innerHTML = `<div class="p-title">Einheiten · noch ${Math.max(0, left)} diese Runde · ${FACTIONS[f].money} ${Math.floor(p.credits)}</div><div class="cards">${cards}</div><div class="p-desc" id="sdesc">Neue Einheiten sind ab der nächsten Runde einsatzbereit.${list.includes('schiff') ? ' Ein Landungsschiff als eigenes Gunboat kommt am Landefeld an (höchstens 2).' : ''}</div>`;
     el.appendChild(box);
     this.paintIcons(box);
     box.querySelectorAll('[data-u]').forEach((b) => {
@@ -546,6 +597,7 @@ export class Controller {
   toggleVents() { this.r.showVents = !this.r.showVents; $('#ventbtn').classList.toggle('on', this.r.showVents); }
   jumpHome() {
     const g = this.g;
+    if (g.fac(0) === 'marines') { const L = g.map.lz, p = center(L.c, L.r); this.r.centerOn(p.x, p.y, true); this.deselect(false); this.showShop(g.lzPoint); return; }
     const z = g.buildings.find((b) => b.owner === 0 && (b.type === 'zentrale' || b.type === 'fob'));
     const s = g.units.find((u) => u.owner === 0 && u.type === 'schiff');
     const t = z || s;

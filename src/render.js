@@ -2,7 +2,7 @@
 import { center, hexPath, R, HW, VS, distance, corners, pixelToHex } from './hex.js';
 import { clamp, rgba, shade, Noise, mulberry32 } from './util.js';
 import { TERRAIN, FACTIONS, UNITS, BUILDINGS, SITES } from './data.js';
-import { drawThing, drawVent, drawScaffold, drawSite } from './sprites.js';
+import { drawThing, drawVent, drawScaffold, drawSite, drawSchiff } from './sprites.js';
 import { bakeTerrain, paintDecal, paintTracks } from './terrain.js';
 
 const TAU = Math.PI * 2;
@@ -14,6 +14,7 @@ export class Renderer {
     this.g = game;
     this.cam = { x: 0, y: 0, z: 1 };
     this.t = 0; this.shake = 0;
+    this.ghosts = [];
     this.parts = []; this.tracers = []; this.floaters = []; this.pings = []; this.rings = [];
     this.hl = { move: null, attack: [], target: [], path: null, sel: null };
     this.showVents = false;
@@ -208,6 +209,7 @@ export class Renderer {
     this.drawFog(ctx);
     this.drawLights(ctx, list);
     this.drawMist(ctx, view);
+    for (const gs of this.ghosts) { ctx.save(); ctx.translate(gs.x, gs.y); ctx.scale(1.3, 1.3); drawSchiff(ctx, gs.col, gs.face, this.t, gs.alt > 0.05, gs.alt); ctx.restore(); if (gs.alt > 0.05) { const gr = ctx.createRadialGradient(gs.x, gs.y + 40 * gs.alt, 0, gs.x, gs.y + 40 * gs.alt, 90); gr.addColorStop(0, 'rgba(255,250,230,0.08)'); gr.addColorStop(1, 'rgba(255,250,230,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(gs.x, gs.y + 40 * gs.alt, 90, 0, TAU); ctx.fill(); } }
     this.drawHighlights(ctx, 'dark');
     // Melder
     this.drawTrackerRing(ctx);

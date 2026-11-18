@@ -52,7 +52,7 @@ function buyPhase(g, pid) {
       if (count('sani') < 2) bag.push('sani');
       if (count('pionier') < 2) bag.push('pionier', 'pionier');
       if (p.credits > 1000 && count('panzerwagen') < 2) bag.push('panzerwagen');
-      if (count('schiff') < 2 && p.credits > 1900 && g.buildings.some((b) => b.owner === pid && b.type === 'fob')) type = 'schiff';
+      if (count('schiff') < 1 && p.credits > 1300 && g.round > 3) type = 'schiff';
       else type = pick(bag);
     }
     if (g.round >= 6 && p.credits >= 560 && !count('synth') && Math.random() < 0.35) type = 'synth';

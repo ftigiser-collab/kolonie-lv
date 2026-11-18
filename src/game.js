@@ -10,7 +10,7 @@ class Heap {
   pop() { const a = this.a, top = a[0], last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && a[l][0] < a[m][0]) m = l; if (r < a.length && a[r][0] < a[m][0]) m = r; if (m === i) break; [a[m], a[i]] = [a[i], a[m]]; i = m; } } return top; }
 }
 
-const SPAWN_LIMIT = { zentrale: 3, werkstatt: 1, fob: 3, schiff: 2 };
+const SPAWN_LIMIT = { zentrale: 3, werkstatt: 1, fob: 3, schiff: 2, lz: 3 };
 
 export class Game {
   constructor(map, opts = {}) {
@@ -26,6 +26,7 @@ export class Game {
     const n = this.W * this.H;
     this.resin = new Uint8Array(n); this.fire = new Uint16Array(n); this.acid = new Uint16Array(n);
     this.flares = []; this.charges = []; this.core = null; this.objOffer = [];
+    this.lzPoint = { id: -1, isLz: true, type: 'lz', c: map.lz.c, r: map.lz.r, spawned: 0 };
     this.befall = 0; this.biomass = 8; this.bursts = 0; this.motherSpawned = false;
     this.storm = { active: false, until: 0, next: 7 + Math.floor(Math.random() * 4) };
     this.events = []; this.log = [];
@@ -84,7 +85,7 @@ export class Game {
     const z = m.colony;
     for (const t of ['miliz', 'miliz', 'miliz', 'spaeher', 'techniker', 'brenner']) { const h = this.freeHexNear(z.c, z.r, t, 4); if (h) this.addUnit(S, t, h[0], h[1]); }
     const pads = ring(m.lz.c, m.lz.r, 1, this.W, this.H).filter(([c, r]) => this.terr(c, r) === 'pad');
-    for (let i = 0; i < 2; i++) { const h = pads.find(([c, r]) => !this.unitAt(c, r)); if (h) { const s = this.addUnit(M, 'schiff', h[0], h[1]); s.landed = true; } }
+    void pads;
     for (const t of ['schuetze', 'schuetze', 'unteroff', 'smartgun', 'pionier', 'sani']) { const h = this.freeHexNear(m.lz.c, m.lz.r, t, 4); if (h) this.addUnit(M, t, h[0], h[1]); }
     // Brut: Nest, Harz, Eier, zwei Läufer in den Schächten
     for (const [c, r] of ring(m.nest.c, m.nest.r, 2, this.W, this.H)) if (this.terr(c, r) !== 'chasm') this.resin[this.idx(c, r)] = 1;
@@ -121,7 +122,7 @@ export class Game {
     p.turnTick = ++this.tick;
     for (const u of this.units) if (u.owner === p.id) { u.moved = false; u.acted = false; u.mvLeft = null; u.watchReady = true; }
     for (const b of this.buildings) { if (b.owner === p.id) b.spawned = 0; b.fired = []; }
-    for (const u of this.units) if (u.owner === p.id && u.type === 'schiff') u.spawned = 0;
+    if (p.faction === 'marines') this.lzPoint.spawned = 0;
     if (p.faction === 'marines') this.resupply(p.id);
     this.computeVis(p.id);
     if (p.id === 0) { this.computeVis(0); this.makeBlips(this.lastSince); }
@@ -575,8 +576,7 @@ export class Game {
     if (p.out || p.faction !== 'marines') return;
     const hasUnits = this.units.some((u) => u.owner === pid);
     const hasFob = this.buildings.some((b) => b.owner === pid && b.type === 'fob');
-    const hasShip = this.units.some((u) => u.owner === pid && u.type === 'schiff');
-    if (!hasUnits && !hasFob || !hasShip && !hasFob && !hasUnits) { p.out = true; this.say('Die Marines haben keine Verbindung mehr zum Orbit — ausgeschieden.', pid === 0 ? 'bad' : 'good'); }
+    if (!hasUnits && !hasFob && p.credits < 220) { p.out = true; this.say('Die Marines haben keine Verbindung mehr zum Orbit — ausgeschieden.', pid === 0 ? 'bad' : 'good'); }
   }
 
   // ---------- Sonderaktionen ----------
@@ -880,26 +880,27 @@ export class Game {
   spawnPoints(pid) {
     const f = this.fac(pid);
     if (f === 'siedler') return this.buildings.filter((b) => b.owner === pid && !b.progress && this.bdef(b).recruit);
-    return [...this.buildings.filter((b) => b.owner === pid && b.type === 'fob' && !b.progress), ...this.units.filter((u) => u.owner === pid && u.type === 'schiff' && u.landed)];
+    return [...(this.lzBlocked(pid) ? [] : [this.lzPoint]), ...this.buildings.filter((b) => b.owner === pid && b.type === 'fob' && !b.progress)];
   }
   buyList(pid, sp) {
     if (this.fac(pid) === 'siedler') return sp && sp.isBld ? this.bdef(sp).recruit || [] : [];
-    return MARINE_BUY.filter((t) => t !== 'schiff' || (sp && sp.isBld));
+    return MARINE_BUY;
   }
+  lzBlocked(pid) { const L = this.map.lz; return this.units.some((u) => u.owner !== pid && this.onMap(u) && !this.flying(u) && this.def(u).cls !== 'egg' && distance(u.c, u.r, L.c, L.r) <= 2); }
   spawnLimit(sp) { return SPAWN_LIMIT[sp.type] || 2; }
   canBuy(pid, type, sp) {
     const d = UNITS[type], p = this.players[pid];
     if (!d || (d.fac !== p.faction && d.fac !== 'both') || p.credits < d.cost) return false;
     if (type === 'synth' && this.units.some((u) => u.owner === pid && u.type === 'synth')) return false;
     if (!this.buyList(pid, sp).includes(type)) return false;
-    if (type === 'schiff') return this.units.filter((u) => u.owner === pid && u.type === 'schiff').length < 2 && !!this.lzHex(type);
+    if (type === 'schiff') return this.units.filter((u) => u.owner === pid && u.type === 'schiff').length < 2 && !!this.lzHex(type) && !this.lzBlocked(pid);
     if ((sp.spawned || 0) >= this.spawnLimit(sp)) return false;
     return !!this.spawnHex(type, sp);
   }
   spawnHex(type, sp) {
     const opts = neighbors(sp.c, sp.r, this.W, this.H).filter(([c, r]) => this.canStand(type, c, r));
     if (opts.length) return opts[Math.floor(Math.random() * opts.length)];
-    if (sp.isBld) return this.freeHexNear(sp.c, sp.r, type, 2);
+    if (sp.isBld || sp.isLz) return this.freeHexNear(sp.c, sp.r, type, 2);
     return null;
   }
   lzHex(type) { return this.freeHexNear(this.map.lz.c, this.map.lz.r, type, 3); }
@@ -912,7 +913,8 @@ export class Game {
     u.moved = u.acted = true; u.lastMove = this.tick;
     if (type === 'synth') { u.sleeper = Math.random() < SLEEPER_CHANCE; u.scanned = false; }
     if (type !== 'schiff') sp.spawned = (sp.spawned || 0) + 1;
-    this.events.push({ type: 'spawn', id: u.id, from: type === 'schiff' ? null : [sp.c, sp.r] });
+    if (this.fac(pid) === 'marines') this.events.push({ type: type === 'schiff' ? 'shipin' : 'dropin', ids: [u.id], c: u.c, r: u.r, owner: pid });
+    else this.events.push({ type: 'spawn', id: u.id, from: [sp.c, sp.r] });
     if (pid === 0) this.computeVis(0);
     return u;
   }
@@ -953,7 +955,10 @@ export class Game {
       st.labor = held('labor') ? st.labor + 1 : 0;
       st.funk = held('funkmast') ? st.funk + 1 : 0;
       // Sonderorder: Wirt im gelandeten Schiff auf dem Landefeld
-      if (p.faction === 'marines') for (const s of this.units) if (s.owner === p.id && s.type === 'schiff' && s.landed && this.terr(s.c, s.r) === 'pad' && s.cargo.some((id) => { const x = this.units.find((o) => o.id === id); return x && x.host; })) st.wirt = 1;
+      if (p.faction === 'marines' && p.obj && p.obj.key === 'wirt' && !p.obj.done) {
+        const h = this.units.find((u) => u.owner === p.id && u.host && this.onMap(u) && this.terr(u.c, u.r) === 'pad');
+        if (h) { st.wirt = 1; this.units = this.units.filter((x) => x !== h); this.events.push({ type: 'dropout', c: h.c, r: h.r, owner: p.id }); if (p.id === 0) this.say('Der Wirt wurde vom Landefeld ausgeflogen — der Konzern hat sein Exemplar.', 'good'); }
+      }
     }
     // Einkommen
     for (const p of humans) {

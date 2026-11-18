@@ -145,8 +145,9 @@ async function start(save) {
   if (!save) {
     ctrl.hooks.save();
     const f = game.fac(0);
-    ctrl.logMsg(f === 'siedler' ? 'Haltet die Kolonie. Der Techniker baut aus, die Zentrale bildet Trupps aus.' : 'Landefeld gesichert. Pionier: FOB nahe einem Schlüsselort errichten.', 'info');
+    ctrl.logMsg(f === 'siedler' ? 'Haltet die Kolonie. Der Techniker baut aus, die Zentrale bildet Trupps aus.' : 'Gelandet. Nachschub: ⌂ oder Landefeld antippen. Pionier: FOB nahe einem Schlüsselort errichten.', 'info');
     ctrl.logMsg('Grüne Signale = Bewegung auf dem Melder. Was es ist, zeigt erst Licht oder Nähe.', 'warn');
+    await ctrl.playIntro();
     await ctrl.banner(map.name, `${game.players[0].name} gegen ${game.players[1].name} · Ziel ${game.target}`, 1.8);
     if (game.objOffer.length) ctrl.showObjective(true);
   } else await ctrl.banner(`Runde ${game.round}`, 'Gefecht fortgesetzt', 1.2);

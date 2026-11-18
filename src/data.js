@@ -8,7 +8,7 @@ export const FACTIONS = {
   marines: {
     name: 'Kolonialmarines', short: 'Marines', color: '#72b6f0', dark: '#10304e', money: 'Nachschub',
     desc: 'Eingreiftruppe aus dem Orbit, geschickt, um den Aufstand niederzuschlagen. Landungsschiffe statt Basis.',
-    perk: 'Jeder Trupp mit Kurzstrecken-Melder · Nachschub landet an Landungsschiffen und FOBs · Munition begrenzt',
+    perk: 'Jeder Trupp mit Kurzstrecken-Melder · Nachschub kommt per Lieferflug ans Landefeld und an FOBs · Gunboats kaufbar · Munition begrenzt',
   },
   brut: { name: 'Die Brut', short: 'Brut', color: '#a98cff', dark: '#1a1030', money: 'Biomasse', desc: 'Gegen alle.' },
 };
@@ -44,7 +44,7 @@ export const UNITS = {
   sani:       { fac: 'marines', name: 'Sanitäter', cls: 'inf', hp: 11, atk: 3, rng: [1, 2], mv: 4, sight: 3, tracker: 3, ammo: 4, cost: 200, abil: ['heal'], desc: 'Heilt Trupps daneben und stabilisiert Befallene (+1 Runde).' },
   flammer:    { fac: 'marines', name: 'Flammentrupp', cls: 'inf', hp: 12, atk: 6, rng: [1, 1], mv: 4, sight: 3, tracker: 3, ammo: 4, cost: 260, vs: { xeno: 1.6, egg: 2 }, abil: ['burn'], desc: 'Marines mit Flammenwerfer. Brennt Harz, Eier und Nestknoten weg, Munition knapp.' },
   panzerwagen:{ fac: 'marines', name: 'Panzerwagen', cls: 'veh', hp: 34, atk: 6, rng: [1, 2], mv: 6, sight: 3, armor: 0.4, cap: 4, tracker: 6, ammo: 8, cost: 600, vs: { xeno: 1.1 }, desc: 'Sechsrädriger Schützenpanzer für 4 Trupps, mit Melder.' },
-  schiff:     { fac: 'marines', name: 'Landungsschiff', cls: 'air', hp: 40, atk: 7, rng: [1, 2], mv: 10, sight: 4, armor: 0.35, cap: 6, tracker: 7, ammo: 6, cost: 1500, desc: 'Fliegt über alles. Nur gelandet nimmt es auf, setzt ab und dient als Nachschubpunkt — dann ist es verwundbar.' },
+  schiff:     { fac: 'marines', name: 'Landungsschiff', cls: 'air', hp: 40, atk: 7, rng: [1, 2], mv: 10, sight: 4, armor: 0.35, cap: 6, tracker: 7, ammo: 6, cost: 900, desc: 'Eigenes Gunboat, kommt am Landefeld an. Fliegt über alles und feuert aus der Luft. Gelandet nimmt es auf, setzt ab und heilt Befall — dann ist es verwundbar.' },
   // ---- Beide Seiten ----
   synth:      { fac: 'both', name: 'Synthetiker', cls: 'inf', hp: 16, atk: 4, rng: [1, 2], mv: 5, sight: 4, tracker: 5, cost: 450, synth: true, abil: ['repair'], desc: 'Künstlicher Mensch: immun gegen Befall, sieht die Brut im Dunkeln auf 3 Felder. Ob er wirklich euch gehorcht, zeigt erst ein Scan.' },
   // ---- Brut ----
@@ -104,7 +104,7 @@ export const DIFFICULTY = {
 
 // Geheime Ziele: je Seite eines, nur für die eigene Seite sichtbar
 export const OBJECTIVES = {
-  wirt:       { fac: 'marines', name: 'Sonderorder: Exemplar bergen', pts: 10, desc: 'Der Konzern will die Brut lebend. Bringt einen befallenen Trupp in ein Landungsschiff und landet es auf dem Landefeld — am Rundenende muss der Wirt noch leben.' },
+  wirt:       { fac: 'marines', name: 'Sonderorder: Exemplar bergen', pts: 10, desc: 'Der Konzern will die Brut lebend. Bringt einen befallenen Trupp lebend aufs Landefeld — am Rundenende wird er ausgeflogen.' },
   zerschlagen:{ fac: 'marines', name: 'Aufstand zerschlagen', pts: 8, ai: true, desc: 'Zerstört 4 Bauten der Siedler.' },
   minen:      { fac: 'marines', name: 'Erzvorkommen sichern', pts: 8, ai: true, desc: 'Haltet am Rundenende beide Erzminen gleichzeitig.' },
   funk:       { fac: 'siedler', name: 'Funkspruch absetzen', pts: 8, ai: true, desc: 'Haltet den Funkmast 3 Runden in Folge besetzt. Die anderen Kolonien sollen erfahren, was hier geschieht.' },

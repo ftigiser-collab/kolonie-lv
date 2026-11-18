@@ -24,8 +24,8 @@ Spin-off von [Sandthron](https://github.com/ftigiser-collab/sandthron) im Alien-
 ## Zwei ungleiche Seiten
 | Freie Siedler | Kolonialmarines |
 |---|---|
-| Feste Basis um die Kolonie-Zentrale | Keine Basis: Landungsschiffe und FOBs |
-| Zentrale bildet Infanterie aus, Werkstatt baut Lademech und Raupenschlepper | Nachschub landet an gelandeten Schiffen (2/Runde) und FOBs (3/Runde) |
+| Feste Basis um die Kolonie-Zentrale | Keine Basis: Landefeld, FOBs, Lieferflüge |
+| Zentrale bildet Infanterie aus, Werkstatt baut Lademech und Raupenschlepper | Jede Anforderung kommt per Lieferflug ans Landefeld (3/Runde) oder an ein FOB (3/Runde); Gunboats (900) werden gekauft |
 | Techniker baut im Umkreis von 3 Feldern um eigene Bauten | Pionier errichtet FOBs (max. 3) und baut im Umkreis von 2 |
 | Wohnmodule bringen Vorräte, Krankenstation heilt Befall | Sanitätszelt heilt Befall, Munition begrenzt (Auffüllen an FOB, Schiff, Landefeld) |
 | Kennen alle Schächte | Jeder Trupp mit Kurzstrecken-Melder, Unteroffizier mit großem Melder |
@@ -63,6 +63,7 @@ Spin-off von [Sandthron](https://github.com/ftigiser-collab/sandthron) im Alien-
 - Aufgeräumte Oberfläche, kompakte Kopfzeile auf dem Handy
 - Mehr Details: Rohrleitungen und Laternen entlang der Fahrwege (teils flackernd), Container und Fässer an Kolonie und Orten, verlassene Bergbaumaschinen, Leuchtfeuer am Landefeld, Dampf aus Spalten und Schächten, glänzendes Harz, Fahrspuren von Fahrzeugen, Patronenhülsen, Scheinwerferkegel der Wachtürme
 - Neu: Spucker, Nestknoten, Flammentrupp, Munitionsdepot, Wachturm
+- Marines: Einflugsequenz zum Start, jeder Nachschub mit eigenem Lieferflug, Landungsschiff als Gunboat nur per Kauf; neues Schiffsdesign (schwerer Senkrechtstarter mit vier Mantelschrauben, Heckrampe, Waffenträgern)
 - Brut im eigenen Horror-Design: ausgemergelte, nass glänzende schwarze Lauerer mit Krallenarmen, freiliegenden Rippen und Wirbeln, gehörntem Schädel mit vierteiligem Blütenkiefer und glühendem Schlund, peitschende Rückenfäden; Klammerer als Neunauge, Brutling als schwarzer Aal, Eier als dunkle Brutsäcke
 - Feinere Trupps (Arme, Visiere, Bergbauhelme mit Stirnlampe, Waffen je Rolle) und Fahrzeuge (Hydraulik, Ladung, Luken, Waffenkapseln)
 - Begehbare Felder und Zielfelder auch im Dunkeln sichtbar
