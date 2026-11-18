@@ -63,7 +63,7 @@ Spin-off von [Sandthron](https://github.com/ftigiser-collab/sandthron) im Alien-
 - Aufgeräumte Oberfläche, kompakte Kopfzeile auf dem Handy
 - Mehr Details: Rohrleitungen und Laternen entlang der Fahrwege (teils flackernd), Container und Fässer an Kolonie und Orten, verlassene Bergbaumaschinen, Leuchtfeuer am Landefeld, Dampf aus Spalten und Schächten, glänzendes Harz, Fahrspuren von Fahrzeugen, Patronenhülsen, Scheinwerferkegel der Wachtürme
 - Neu: Spucker, Nestknoten, Flammentrupp, Munitionsdepot, Wachturm
-- Brut im eigenen Design: Chitinpanzer aus Segmenten, Sichelarme, Augenbündel, Stachelschwanz; Klammerer als Zecke, Brutling als Larve, Eier als leuchtende Brutsäcke
+- Brut im eigenen Horror-Design: ausgemergelte, nass glänzende schwarze Lauerer mit Krallenarmen, freiliegenden Rippen und Wirbeln, gehörntem Schädel mit vierteiligem Blütenkiefer und glühendem Schlund, peitschende Rückenfäden; Klammerer als Neunauge, Brutling als schwarzer Aal, Eier als dunkle Brutsäcke
 - Feinere Trupps (Arme, Visiere, Bergbauhelme mit Stirnlampe, Waffen je Rolle) und Fahrzeuge (Hydraulik, Ladung, Luken, Waffenkapseln)
 - Begehbare Felder und Zielfelder auch im Dunkeln sichtbar
 
