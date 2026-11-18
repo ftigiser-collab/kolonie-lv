@@ -222,7 +222,21 @@ export class Renderer {
         ctx.strokeStyle = rgba(col, s.manned ? 0.85 : 0.4); ctx.lineWidth = 3; ctx.setLineDash(s.manned ? [] : [6, 5]);
         ctx.beginPath(); ctx.arc(p.x, p.y, R * (s.type === 'prozessor' ? 1.55 : 1.05), 0, TAU); ctx.stroke(); ctx.setLineDash([]);
       }
+      if (s.type === 'prozessor' && g.core != null) {
+        const k = 0.5 + 0.5 * Math.sin(t * (4 + (10 - g.core)));
+        const gr = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, R * 2.2); gr.addColorStop(0, `rgba(255,80,40,${0.25 + 0.25 * k})`); gr.addColorStop(1, 'rgba(255,60,30,0)');
+        ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, p.y, R * 2.2, 0, TAU); ctx.fill();
+      }
       ctx.save(); ctx.translate(p.x, p.y); drawSite(ctx, s.type, t + s.id); ctx.restore();
+      if (s.type === 'prozessor' && g.core != null) { ctx.font = '900 16px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillText(`☢ ${g.core}`, p.x + 1, p.y - R * 1.25 + 1); ctx.fillStyle = '#ff7a5a'; ctx.fillText(`☢ ${g.core}`, p.x, p.y - R * 1.25); ctx.textAlign = 'left'; }
+    }
+    // eigene Sprengladungen
+    for (const k of g.charges) {
+      if (k.owner !== 0) continue;
+      const p = center(k.c, k.r), on = Math.sin(t * 8) > 0;
+      ctx.fillStyle = '#2a2622'; ctx.fillRect(p.x - 6, p.y - 4, 12, 8);
+      ctx.fillStyle = on ? '#ff3a2a' : '#5a1a14'; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, TAU); ctx.fill();
+      if (on) { ctx.fillStyle = 'rgba(255,60,40,0.25)'; ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, TAU); ctx.fill(); }
     }
     // Bauten
     for (const b of g.buildings) {
@@ -290,6 +304,7 @@ export class Renderer {
     if (u.owner === 0 && d.ammo) { if (u.ammo <= 1) badge(u.ammo ? 'Mun 1' : 'Mun 0', u.ammo ? '#7a5a14' : '#6a1a14'); }
     if (u.cargo && u.cargo.length) badge(`${u.cargo.length}▲`, 'rgba(20,30,40,0.85)');
     if (u.type === 'schiff' && u.landed) badge('gelandet', 'rgba(30,40,30,0.85)', '#cfe8c8');
+    if (u.type === 'synth' && u.owner === 0) badge(u.scanned ? 'loyal' : 'ungeprüft', u.scanned ? 'rgba(20,60,40,0.85)' : 'rgba(80,60,10,0.85)');
   }
 
   drawFog(ctx) {

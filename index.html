@@ -24,8 +24,10 @@
     <div class="stat cash"><span class="lbl" id="cashlbl">Vorräte</span><b id="credits">0</b></div>
     <div id="score"></div>
     <div id="befall" class="stat"></div>
+    <div id="core" class="stat" title="Atmosphäreprozessor überhitzt: Runden bis zur Kernschmelze" style="display:none"><span class="lbl">Prozessor</span><b>10</b></div>
     <div id="storm" class="stat" title="Staubsturm: alle sehen 1 Feld weniger" style="display:none"><span class="lbl">Wetter</span><b>Sturm</b></div>
     <div class="spacer"></div>
+    <button id="objbtn" title="Geheimziel">🎯</button>
     <button id="basebtn" title="Zur Basis / zum FOB">⌂</button>
     <button id="ventbtn" title="Schachtnetz zeigen (V)">⌁ Schächte</button>
     <button id="speedbtn" title="Tempo der gegnerischen Züge">⏩ 1×</button>
@@ -87,6 +89,15 @@
         <li><b>Befall</b> steigt mit der Zeit, mit Harz, Ausbrüchen und gefallenen Menschen; er sinkt mit jedem getöteten Brutwesen und abgebranntem Harz. Stufen: 1 Läufer, 2 Jäger, 3 Brecher, 4 die Mutter. <b>Bei 100 % verhängt der Orbit die Quarantäne — alle verlieren.</b> Die Mutter zu töten senkt den Befall um 15.</li>
         <li>Die Brut greift auch Bauten an. Fällt ein Wohnmodul, werden die Bewohner eingesponnen. Flutlichter hasst sie besonders.</li>
       </ul>
+      <h3>Geheimziele, Synthetiker, Prozessor</h3>
+      <ul>
+        <li><b>Geheimziel:</b> Zu Beginn wählt ihr eines von zwei Zielen (🎯 oben zeigt den Fortschritt). Erfüllt bringt es 8–14 Punkte und 300. Die Gegenseite hat auch eines — ihr erfahrt es erst, wenn sie es erfüllt.</li>
+        <li><b>Synthetiker</b> (beide Seiten, höchstens einer, 450): immun gegen Befall, sieht die Brut im Dunkeln auf 3 Felder, Melder 5, repariert und kühlt. Aber rund jeder dritte trägt einen <b>versteckten Konzernbefehl</b>: Irgendwann — je höher der Befall und je näher ihr am Sieg seid, desto wahrscheinlicher — läuft er über, öffnet verschweißte Schächte, legt Geschütze lahm und greift an.</li>
+        <li><b>Scannen:</b> Sanitäter, Techniker oder Pionier daneben prüfen die Loyalität. Ein Schläfer schlägt sofort los — besser jetzt als im falschen Moment.</li>
+        <li><b>Atmosphäreprozessor:</b> Ab 55 % Befall überhitzt er: 10 Runden bis zur <b>Kernschmelze</b>, dann verlieren alle. Techniker, Pioniere und Synthetiker daneben kühlen (+3 Runden). Sinkt der Befall unter 40 %, beruhigt er sich.</li>
+        <li><b>Orbitalschlag</b> (Marines, Unteroffizier, 800, alle 5 Runden): ein sichtbares Feld in 6 Feldern samt Nachbarn — 14 Schaden in der Mitte, 10 daneben, auch für eigene Einheiten. Brennt Harz weg und verschüttet Schächte.</li>
+        <li><b>Sprengladung</b> (Siedler, Techniker, 150): auf ein Nachbarfeld, zündet am Rundenende — 10 Schaden in der Mitte, 7 daneben, verschüttet einen Schacht dauerhaft (kann nicht mehr aufgebrochen werden).</li>
+      </ul>
       <h3>Sieg</h3>
       <ul>
         <li><b>Schlüsselorte:</b> Atmosphäreprozessor (2 Punkte), Funkmast, Labor, zwei Erzminen (je 1). Einnehmen: am Rundenende auf dem Feld stehen, ohne Gegner daneben.</li>
@@ -110,6 +121,7 @@
         <li>Grüner Punkt = Melder-Signal · gestrichelter grüner Kreis = Signal aus dem Schacht</li>
         <li>Farbiger Ring um einen Ort = Besitzer · durchgezogen besetzt, gestrichelt unbesetzt</li>
         <li>Gitter mit orangem Kreuz = verschweißter Schacht</li>
+        <li>🎯 = Geheimziel · R. = Runden · blinkendes Rot am Boden = eigene Sprengladung</li>
       </ul>
     </div>
   </div>
@@ -122,6 +134,7 @@
 
   <div id="gmenu" class="ovl"></div>
   <div id="setup" class="ovl"></div>
+  <div id="objbox" class="ovl"></div>
 
   <div id="menu">
     <canvas id="menubg"></canvas>
@@ -134,7 +147,7 @@
       <button id="loadbtn" class="big">Spielstände</button>
       <button id="mhelp" class="big">Anleitung</button>
       <div class="loading">Die Kolonie wird vermessen …</div>
-      <div class="m-ver">Alien-Spin-off von Sandthron · Stufe 1</div>
+      <div class="m-ver">Alien-Spin-off von Sandthron · Stufe 2</div>
     </div>
   </div>
 </div>

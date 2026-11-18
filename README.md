@@ -46,14 +46,20 @@ Spin-off von [Sandthron](https://github.com/ftigiser-collab/sandthron) im Alien-
 - Alle Grafiken per Code: Trupps, Fahrzeuge, Landungsschiffe, Brut, Bauten, Orte, Harz, Licht und Dunkelheit
 - Spielstände (Autospeicher + 3 Plätze), offline spielbar
 
-## Geplant (Stufe 2)
-- Geheime Fraktionsziele (z. B. Exemplar lebend bergen, Kolonie evakuieren, Beweise vernichten)
-- Synthetiker mit verdeckter Loyalität
-- Atmosphäreprozessor mit Überhitzungs-Countdown, Option „Aus dem Orbit ausradieren"
+## Stand: Stufe 2
+- **Geheimziele:** Zu Beginn wählt ihr eines von zwei Zielen, die KI-Gegenseite hat ebenfalls eines, das erst beim Erfüllen sichtbar wird (8–14 Punkte + 300). Marines: Sonderorder „Exemplar bergen“ (befallenen Trupp lebend im Landungsschiff aufs Landefeld bringen), Aufstand zerschlagen, Erzvorkommen sichern. Siedler: Funkspruch absetzen, Schächte versiegeln, Landungsschiff abschießen, Brutstätten ausbrennen. Beide: Labordaten sichern, Brut eindämmen, die Mutter töten.
+- **Synthetiker** (beide Seiten, höchstens einer): immun gegen Befall, sieht die Brut im Dunkeln auf 3 Felder. Rund jeder dritte trägt einen versteckten Konzernbefehl und läuft irgendwann über — öffnet verschweißte Schächte, legt Geschütze lahm, greift an. Sanitäter, Techniker oder Pionier können scannen: Ein Schläfer schlägt dann sofort los.
+- **Atmosphäreprozessor:** ab 55 % Befall Überhitzung, 10 Runden bis zur Kernschmelze (alle verlieren). Techniker, Pioniere und Synthetiker kühlen (+3), unter 40 % Befall beruhigt er sich.
+- **Orbitalschlag** (Marines, Unteroffizier, 800, alle 5 Runden) und **Sprengladung** (Siedler, Techniker, 150, zündet am Rundenende): Flächenschaden auf Feld und Nachbarn, brennt Harz weg, verschüttet Schächte dauerhaft.
+- KI nutzt Geheimziele, Synthetiker samt Scan, Kühlung, Orbitalschläge und Sprengladungen.
+
+## Geplant
+- Mehr Kartentypen (Kolonie im Eis, Raffinerie, Raumstation)
+- Feinbalance nach Testpartien
 - **Später:** Sound und Musik
 
 ## Legende
-LP = Lebenspunkte · Rw = Reichweite · Bew = Bewegung · Mun = Munition · FOB = vorgeschobener Stützpunkt (Forward Operating Base) · PWA = installierbare Web-App (Progressive Web App) · KI = künstliche Intelligenz (Computergegner)
+R. = Runden · LP = Lebenspunkte · Rw = Reichweite · Bew = Bewegung · Mun = Munition · FOB = vorgeschobener Stützpunkt (Forward Operating Base) · PWA = installierbare Web-App (Progressive Web App) · KI = künstliche Intelligenz (Computergegner)
 
 ## Technik
 Reines HTML/JavaScript (ES-Module), Canvas 2D, keine Abhängigkeiten.

@@ -1,5 +1,5 @@
 // Regelwerk: Züge, Bewegung, Kampf, Melder-Nebel, Schächte, Brut, Befall
-import { UNITS, BUILDINGS, TERRAIN, SITES, FACTIONS, START_CASH, BOUNTY, HOST_TIME, LIGHT_FLARE, STAGE_NAMES, MARINE_BUY } from './data.js';
+import { UNITS, BUILDINGS, TERRAIN, SITES, FACTIONS, START_CASH, BOUNTY, HOST_TIME, LIGHT_FLARE, STAGE_NAMES, MARINE_BUY, OBJECTIVES, SLEEPER_CHANCE, ORBITAL, CHARGE, CORE } from './data.js';
 import { neighbors, distance, ring } from './hex.js';
 
 
@@ -19,13 +19,13 @@ export class Game {
     this.diff = opts.diff || { aiCash: 1, brood: 1 };
     this.target = opts.target || 30;
     const fac = opts.faction || 'siedler', other = fac === 'siedler' ? 'marines' : 'siedler';
-    this.players = [fac, other, 'brut'].map((f, id) => ({ id, faction: f, ai: id !== 0, name: FACTIONS[f].name, credits: f === 'brut' ? 0 : START_CASH * (id === 0 ? 1 : this.diff.aiCash), score: 0, out: false, turnTick: 0 }));
+    this.players = [fac, other, 'brut'].map((f, id) => ({ id, faction: f, ai: id !== 0, name: FACTIONS[f].name, credits: f === 'brut' ? 0 : START_CASH * (id === 0 ? 1 : this.diff.aiCash), score: 0, out: false, turnTick: 0, orbitalAt: 0, obj: null, stats: { xeno: 0, eggs: 0, resin: 0, bld: 0, ships: 0, mother: 0, labor: 0, funk: 0 } }));
     this.units = []; this.buildings = [];
     this.sites = map.sites.map((s, i) => ({ ...s, id: i, owner: -1, blocked: false }));
     this.vents = map.vents.map((v) => ({ ...v, links: [...v.links], sealed: false }));
     const n = this.W * this.H;
     this.resin = new Uint8Array(n); this.fire = new Uint16Array(n); this.acid = new Uint16Array(n);
-    this.flares = [];
+    this.flares = []; this.charges = []; this.core = null; this.objOffer = [];
     this.befall = 0; this.biomass = 8; this.bursts = 0; this.motherSpawned = false;
     this.storm = { active: false, until: 0, next: 7 + Math.floor(Math.random() * 4) };
     this.events = []; this.log = [];
@@ -94,6 +94,7 @@ export class Game {
     const nv = this.vents.filter((v) => v.kind === 'nest'), cv = this.vents.filter((v) => v.kind === 'cave').sort((a, b) => distance(a.c, a.r, this.W / 2, this.H / 2) - distance(b.c, b.r, this.W / 2, this.H / 2));
     for (const v of [nv[0], cv[0] || nv[1], cv[1]]) if (v) { const u = this.addUnit(2, 'laeufer', v.c, v.r); u.inVent = true; u.ventId = v.id; }
     this.players[2].credits = this.biomass;
+    this.assignObjectives();
     this.beginTurn();
   }
 
@@ -208,10 +209,11 @@ export class Game {
     const i = this.idx(u.c, u.r);
     if (!v.seen[i]) return false;
     const cls = this.def(u).cls;
-    if (cls === 'xeno') return !!this.lit[i] || u.revealUntil >= this.tick || this.near(pid, u.c, u.r, 2);
+    if (cls === 'xeno') return !!this.lit[i] || u.revealUntil >= this.tick || this.near(pid, u.c, u.r, 2) || this.synthNear(pid, u.c, u.r, 3);
     if (cls === 'egg') return !!this.lit[i] || this.near(pid, u.c, u.r, 3);
     return true;
   }
+  synthNear(pid, c, r, d) { return this.units.some((s) => s.owner === pid && s.type === 'synth' && this.onMap(s) && distance(s.c, s.r, c, r) <= d); }
   bVisibleTo(pid, b) { if (b.owner === pid) return true; const v = this.vis[pid]; return !v || v.seen[this.idx(b.c, b.r)] || this.explored[this.idx(b.c, b.r)]; }
   tracked(pid, c, r) { const v = this.vis[pid]; return v && v.trk[this.idx(c, r)]; }
   knowsVent(pid, v) { return this.fac(pid) === 'siedler' || (pid === 0 ? this.ventSeen.has(v.id) : true); }
@@ -412,7 +414,7 @@ export class Game {
   }
   canHit(a, t) {
     const ad = this.def(a);
-    if (a.type === 'klammerer') return !t.isBld && this.def(t).cls === 'inf' && !t.host && !t.inside && !this.isXeno(t);
+    if (a.type === 'klammerer') return !t.isBld && this.def(t).cls === 'inf' && !this.def(t).synth && !t.host && !t.inside && !this.isXeno(t);
     if (ad.atk <= 0) return false;
     if (ad.ammo && !a.ammo) return false;
     if (t.isBld) return a.type !== 'brutling';
@@ -471,7 +473,7 @@ export class Game {
     if (a.type === 'klammerer') return this.leap(a, t);
     const dmg = this.calcDamage(a, t);
     this.events.push({ type: 'attack', a: a.id, t: t.id, dmg });
-    if ((ad.abil || []).includes('burn')) this.ignite(t.c, t.r);
+    if ((ad.abil || []).includes('burn')) this.ignite(t.c, t.r, a.owner);
     this.hurt(t, dmg, a);
     if (this.alive(t) && !t.isBld && this.canCounter(t, a)) {
       const cd = Math.max(1, Math.round(this.calcDamage(t, a) * 0.75));
@@ -491,17 +493,17 @@ export class Game {
       this.units = this.units.filter((u) => u !== k);
       this.events.push({ type: 'leap', a: k.id, t: t.id, from: [k.c, k.r], ok: true });
       if (t.owner === 0) this.say(`${this.def(t).name} wurde befallen — ${HOST_TIME} Runden bis zum Ausbruch!`, 'bad');
-      else if (this.vis[0] && this.vis[0].seen[this.idx(t.c, t.r)]) this.say(`Ein ${this.def(t).name}-Trupp der ${this.players[t.owner].name} wurde befallen.`, 'warn');
+      else if (this.vis[0] && this.vis[0].seen[this.idx(t.c, t.r)]) this.say(`Ein ${this.def(t).name}-Trupp der ${FACTIONS[this.fac(t.owner)].short} wurde befallen.`, 'warn');
     } else {
       this.events.push({ type: 'leap', a: k.id, t: t.id, ok: false });
       if (this.canCounter(t, k)) { const cd = this.calcDamage(t, k); this.events.push({ type: 'attack', a: t.id, t: k.id, dmg: cd, counter: true }); this.hurt(k, cd, t); }
     }
     return true;
   }
-  ignite(c, r) {
+  ignite(c, r, owner = -1) {
     const i = this.idx(c, r);
     this.fire[i] = this.round + 1;
-    if (this.resin[i]) { this.resin[i] = 0; this.befall = Math.max(0, this.befall - 0.4); }
+    if (this.resin[i]) { this.resin[i] = 0; this.befall = Math.max(0, this.befall - 0.4); if (owner >= 0 && owner < 2) this.players[owner].stats.resin++; }
   }
 
   hurt(t, dmg, by, why) {
@@ -518,6 +520,7 @@ export class Game {
       this.buildings = this.buildings.filter((b) => b !== t);
       this.events.push({ type: 'die', bid: t.id, c: t.c, r: t.r, bld: true, kind: t.type });
       const name = this.bdef(t).name;
+      if (byOwner >= 0 && byOwner < 2 && byOwner !== t.owner) this.players[byOwner].stats.bld++;
       if (by && !by.isBld && this.isXeno(by) && t.type === 'wohnmodul') {
         this.biomass += 6; this.befall += 3;
         this.say('Ein Wohnmodul ist gefallen. Die Bewohner wurden eingesponnen.', 'bad');
@@ -525,12 +528,19 @@ export class Game {
       if (t.type === 'zentrale') { this.players[t.owner].out = true; this.say(`Die Kolonie-Zentrale ist gefallen — ${this.players[t.owner].name} sind ausgeschieden.`, 'bad'); }
       if (t.type === 'fob') this.checkMarines(t.owner);
       if (t.owner === 0) this.computeVis(0);
+      this.checkObjectives();
       return;
     }
     const d = this.def(t);
     for (const id of t.cargo) { const x = this.units.find((o) => o.id === id); if (x) { this.units = this.units.filter((o) => o !== x); } }
     this.units = this.units.filter((u) => u !== t);
     this.events.push({ type: 'die', id: t.id, c: t.c, r: t.r, kind: t.type, xeno: this.isXeno(t), owner: t.owner });
+    if (byOwner >= 0 && byOwner < 2) {
+      const st = this.players[byOwner].stats;
+      if (t.type === 'ei') st.eggs++; else if (this.isXeno(t)) st.xeno++;
+      if (t.type === 'mutter') st.mother = 1;
+      if (t.type === 'schiff' && t.owner !== byOwner) st.ships++;
+    }
     if (this.isXeno(t)) {
       this.befall = Math.max(0, this.befall - (t.type === 'mutter' ? 15 : t.type === 'ei' ? 1 : 0.6));
       if (t.type !== 'ei' && t.type !== 'klammerer') this.acidSplash(t, by);
@@ -543,6 +553,7 @@ export class Game {
       if (this.fac(t.owner) === 'marines') this.checkMarines(t.owner);
       if (t.owner === 0) this.computeVis(0);
     }
+    this.checkObjectives();
   }
   acidSplash(x, by) {
     const i = this.idx(x.c, x.r);
@@ -612,8 +623,8 @@ export class Game {
     if (!this.abil(u, 'weld') || u.acted || u.inside) return [];
     return this.vents.filter((v) => !v.sealed && distance(v.c, v.r, u.c, u.r) <= 1 && this.knowsVent(u.owner, v) && !this.units.some((x) => x.inVent && x.ventId === v.id && x.owner === u.owner));
   }
-  weld(u, v) { v.sealed = true; u.acted = u.moved = true; this.events.push({ type: 'weld', c: v.c, r: v.r, id: u.id }); if (u.owner === 0) this.say('Schacht verschweißt.', 'good'); }
-  breakTargets(u) { return u.type === 'jaeger' || u.type === 'brecher' ? this.vents.filter((v) => v.sealed && distance(v.c, v.r, u.c, u.r) <= 1) : []; }
+  weld(u, v) { v.sealed = true; v.sealedBy = u.owner; u.acted = u.moved = true; this.events.push({ type: 'weld', c: v.c, r: v.r, id: u.id }); if (u.owner === 0) this.say('Schacht verschweißt.', 'good'); this.checkObjectives(); }
+  breakTargets(u) { return u.type === 'jaeger' || u.type === 'brecher' ? this.vents.filter((v) => v.sealed && !v.collapsed && distance(v.c, v.r, u.c, u.r) <= 1) : []; }
   breakVent(u, v) {
     v.sealed = false; u.acted = u.moved = true; u.lastMove = this.tick;
     this.events.push({ type: 'breakvent', c: v.c, r: v.r });
@@ -696,7 +707,142 @@ export class Game {
     if (!this.abil(u, 'burn') || u.acted || u.inside) return [];
     return ring(u.c, u.r, 1, this.W, this.H).filter(([c, r]) => this.resin[this.idx(c, r)]);
   }
-  burn(u, c, r) { u.acted = u.moved = true; u.face = Math.atan2(r - u.r, c - u.c); this.ignite(c, r); this.events.push({ type: 'burn', id: u.id, c, r }); }
+  burn(u, c, r) { u.acted = u.moved = true; u.face = Math.atan2(r - u.r, c - u.c); this.ignite(c, r, u.owner); this.events.push({ type: 'burn', id: u.id, c, r }); }
+
+
+  // ---------- Geheime Ziele ----------
+  objPool(pid, aiOnly) {
+    const f = this.fac(pid);
+    return Object.keys(OBJECTIVES).filter((k) => (OBJECTIVES[k].fac === f || OBJECTIVES[k].fac === 'both') && (!aiOnly || OBJECTIVES[k].ai));
+  }
+  assignObjectives() {
+    const shuffle = (a) => a.sort(() => Math.random() - 0.5);
+    for (const p of this.players) {
+      if (p.faction === 'brut') continue;
+      const pool = shuffle(this.objPool(p.id, p.ai));
+      if (p.id === 0) { this.objOffer = pool.filter((k) => k !== 'mutter').slice(0, 2); p.obj = { key: this.objOffer[0], done: false }; }
+      else p.obj = { key: pool.find((k) => k !== 'mutter') || pool[0], done: false };
+    }
+  }
+  chooseObjective(k) { if (this.objOffer.includes(k)) this.players[0].obj = { key: k, done: false }; this.objOffer = []; }
+  objProgress(pid) {
+    const p = this.players[pid], o = p.obj; if (!o) return null;
+    const st = p.stats, sealed = this.vents.filter((v) => v.sealed && v.sealedBy === pid).length;
+    const map = {
+      wirt: [st.wirt ? 1 : 0, 1], zerschlagen: [st.bld, 4], minen: [this.sites.filter((x) => x.type === 'mine' && x.owner === pid).length, 2],
+      funk: [st.funk, 3], labor: [st.labor, 3], versiegeln: [sealed, 5], abschuss: [st.ships, 1],
+      ausbrennen: [Math.max(Math.floor(st.resin / 10 * 6), st.eggs), 6], jagd: [st.xeno, 12], mutter: [st.mother, 1],
+    };
+    const [have, need] = map[o.key] || [0, 1];
+    const text = o.key === 'ausbrennen' ? `${st.resin}/10 Harz · ${st.eggs}/6 Eier` : `${Math.min(have, need)}/${need}`;
+    return { have, need, text, done: o.done };
+  }
+  checkObjectives(roundEnd = false) {
+    for (const p of this.players) {
+      if (!p.obj || p.obj.done || p.out || p.faction === 'brut') continue;
+      if (p.obj.key === 'minen' && !roundEnd) continue;
+      const pr = this.objProgress(p.id);
+      if (pr.have >= pr.need) {
+        p.obj.done = true; p.score += OBJECTIVES[p.obj.key].pts; p.credits += 300;
+        const name = OBJECTIVES[p.obj.key].name;
+        if (p.id === 0) { this.events.push({ type: 'banner', text: 'Geheimziel erfüllt', sub: `${name} · +${OBJECTIVES[p.obj.key].pts} Punkte` }); this.say(`Geheimziel erfüllt: ${name} (+${OBJECTIVES[p.obj.key].pts} Punkte, +300).`, 'good'); }
+        else this.say(`${p.name} haben ihr Geheimziel erfüllt: ${name} (+${OBJECTIVES[p.obj.key].pts} Punkte).`, 'bad');
+      }
+    }
+  }
+
+  // ---------- Synthetiker ----------
+  scanTargets(u) {
+    if (u.acted || u.inside || !(this.abil(u, 'heal') || this.abil(u, 'repair')) || u.type === 'synth') return [];
+    return this.units.filter((s) => s.owner === u.owner && s.type === 'synth' && !s.scanned && this.onMap(s) && distance(s.c, s.r, u.c, u.r) <= 1);
+  }
+  scan(u, s) {
+    u.acted = u.moved = true;
+    this.events.push({ type: 'scan', c: s.c, r: s.r });
+    if (s.sleeper) { this.defect(s, true); return; }
+    s.scanned = true;
+    if (u.owner === 0) this.say('Scan abgeschlossen: Der Synthetiker ist loyal.', 'good');
+    this.events.push({ type: 'float', c: s.c, r: s.r, text: 'loyal ✓', color: '#8ef0c0' });
+  }
+  defect(s, found) {
+    const former = s.owner;
+    if (s.inside) {
+      const car = this.units.find((x) => x.id === s.inside);
+      if (car) { car.cargo = car.cargo.filter((id) => id !== s.id); const h = this.freeHexNear(car.c, car.r, 'synth', 2); if (h) { s.c = h[0]; s.r = h[1]; } }
+      s.inside = null;
+    }
+    s.owner = 2; s.defected = true; s.sleeper = false; s.scanned = true; s.revealUntil = this.tick + 4; s.lastMove = this.tick;
+    s.moved = s.acted = true;
+    // Sabotage im Umkreis von 3
+    let n = 0;
+    for (const v of this.vents) if (v.sealed && !v.collapsed && distance(v.c, v.r, s.c, s.r) <= 3) { v.sealed = false; n++; }
+    for (const b of this.buildings) {
+      if (b.owner !== former || distance(b.c, b.r, s.c, s.r) > 3) continue;
+      if (this.bdef(b).sentry) b.ammo = 0;
+      if (b.type === 'flutlicht') b.hp = Math.min(b.hp, 2);
+    }
+    this.events.push({ type: 'defect', id: s.id, c: s.c, r: s.r, former });
+    const fp = this.players[former];
+    if (former === 0) this.say(found ? 'Der Scan löst einen versteckten Konzernbefehl aus — der Synthetiker wendet sich gegen euch!' : 'Euer Synthetiker folgt einem versteckten Konzernbefehl: Er öffnet Schächte, legt Geschütze lahm und greift an!', 'bad');
+    else if (this.vis[0] && this.vis[0].seen[this.idx(s.c, s.r)]) this.say(`Der Synthetiker der ${FACTIONS[fp.faction].short} ist übergelaufen — zur Brut.`, 'warn');
+    if (n && former === 0) this.say(`${n} verschweißte ${n === 1 ? 'Schacht' : 'Schächte'} wieder offen.`, 'warn');
+    if (this.fac(former) === 'marines') this.checkMarines(former);
+    this.computeVis(0);
+  }
+
+  // ---------- Atmosphäreprozessor ----------
+  coreSite() { return this.sites.find((x) => x.type === 'prozessor'); }
+  canCool(u) {
+    if (this.core == null || u.acted || u.inside || !this.abil(u, 'repair')) return false;
+    const s = this.coreSite(); return distance(s.c, s.r, u.c, u.r) <= 1 && this.core < CORE.max;
+  }
+  cool(u) {
+    this.core = Math.min(CORE.max, this.core + CORE.cool);
+    u.acted = u.moved = true;
+    const s = this.coreSite();
+    this.events.push({ type: 'cool', c: s.c, r: s.r });
+    if (u.owner === 0) this.say(`Kühlung hochgefahren: Der Prozessor hält noch ${this.core} Runden.`, 'good');
+  }
+
+  // ---------- Spezialwaffen ----------
+  orbitalHexes(u) {
+    if (!this.abil(u, 'orbital') || u.acted || u.inside) return [];
+    const p = this.players[u.owner];
+    if (p.credits < ORBITAL.cost || this.round < p.orbitalAt) return [];
+    const v = this.vis[u.owner];
+    return ring(u.c, u.r, ORBITAL.range, this.W, this.H).filter(([c, r]) => !v || v.seen[this.idx(c, r)]);
+  }
+  orbital(u, c, r) {
+    const p = this.players[u.owner];
+    p.credits -= ORBITAL.cost; p.orbitalAt = this.round + ORBITAL.cooldown;
+    u.acted = u.moved = true;
+    this.events.push({ type: 'orbital', c, r, owner: u.owner });
+    if (u.owner !== 0 && this.near(0, c, r, 8)) this.say('Orbitalschlag der Marines!', 'warn');
+    this.blast(c, r, ORBITAL.rad, ORBITAL.dmg, ORBITAL.bld, u);
+  }
+  chargeHexes(u) {
+    if (!this.abil(u, 'charge') || u.acted || u.inside || this.players[u.owner].credits < CHARGE.cost) return [];
+    return neighbors(u.c, u.r, this.W, this.H).filter(([c, r]) => !this.bAt(c, r) && !this.charges.some((k) => k.c === c && k.r === r) && this.terr(c, r) !== 'chasm');
+  }
+  charge(u, c, r) {
+    this.players[u.owner].credits -= CHARGE.cost;
+    u.acted = u.moved = true;
+    this.charges.push({ c, r, owner: u.owner, type: u.type });
+    this.events.push({ type: 'plant', c, r, owner: u.owner });
+    if (u.owner === 0) this.say('Sprengladung gelegt — sie zündet am Rundenende.', 'info');
+  }
+  blast(c, r, rad, dmg, bdmg, by) {
+    for (const [x, y] of ring(c, r, rad, this.W, this.H)) {
+      this.ignite(x, y, by ? by.owner : -1);
+      const u = this.unitAt(x, y, true);
+      if (u && !(u.inVent && distance(c, r, x, y) > 0)) { if (u.inVent) { u.inVent = false; u.ventId = null; } this.hurt(u, distance(c, r, x, y) ? Math.round(dmg * 0.7) : dmg, by); }
+      const b = this.bAt(x, y);
+      if (b) this.hurt(b, bdmg, by);
+    }
+    const v = this.ventAt(c, r);
+    if (v) { v.sealed = true; v.collapsed = true; v.sealedBy = by ? by.owner : -1; }
+    if (by && by.owner === 0 || this.near(0, c, r, 2)) this.computeVis(0);
+  }
 
   // ---------- Bauen und Nachschub ----------
   buildHexes(u, type) {
@@ -739,7 +885,8 @@ export class Game {
   spawnLimit(sp) { return SPAWN_LIMIT[sp.type] || 2; }
   canBuy(pid, type, sp) {
     const d = UNITS[type], p = this.players[pid];
-    if (!d || d.fac !== p.faction || p.credits < d.cost) return false;
+    if (!d || (d.fac !== p.faction && d.fac !== 'both') || p.credits < d.cost) return false;
+    if (type === 'synth' && this.units.some((u) => u.owner === pid && u.type === 'synth')) return false;
     if (!this.buyList(pid, sp).includes(type)) return false;
     if (type === 'schiff') return this.units.filter((u) => u.owner === pid && u.type === 'schiff').length < 2 && !!this.lzHex(type);
     if ((sp.spawned || 0) >= this.spawnLimit(sp)) return false;
@@ -759,6 +906,7 @@ export class Game {
     this.players[pid].credits -= d.cost;
     const u = this.addUnit(pid, type, h[0], h[1]);
     u.moved = u.acted = true; u.lastMove = this.tick;
+    if (type === 'synth') { u.sleeper = Math.random() < SLEEPER_CHANCE; u.scanned = false; }
     if (type !== 'schiff') sp.spawned = (sp.spawned || 0) + 1;
     this.events.push({ type: 'spawn', id: u.id, from: type === 'schiff' ? null : [sp.c, sp.r] });
     if (pid === 0) this.computeVis(0);
@@ -769,17 +917,23 @@ export class Game {
   endRound() {
     const R = this.round;
     const humans = this.players.filter((p) => p.faction !== 'brut');
+    // Sprengladungen zünden
+    for (const k of this.charges) {
+      this.events.push({ type: 'charge', c: k.c, r: k.r, owner: k.owner });
+      this.blast(k.c, k.r, CHARGE.rad, CHARGE.dmg, CHARGE.bld, { type: k.type, owner: k.owner, c: k.c, r: k.r });
+    }
+    this.charges = [];
     // Schlüsselorte
     for (const s of this.sites) {
       const occ = this.unitAt(s.c, s.r);
-      s.blocked = !!(occ && this.isXeno(occ));
-      if (occ && !this.isXeno(occ) && !this.players[occ.owner].out) {
+      s.blocked = !!(occ && (this.isXeno(occ) || occ.owner === 2));
+      if (occ && !this.isXeno(occ) && occ.owner !== 2 && !this.players[occ.owner].out) {
         const foe = this.units.some((u) => this.onMap(u) && !this.isXeno(u) && u.owner !== occ.owner && distance(u.c, u.r, s.c, s.r) <= 1);
         if (!foe && s.owner !== occ.owner) {
           const old = s.owner; s.owner = occ.owner;
           this.events.push({ type: 'capture', sid: s.id, owner: occ.owner });
           if (occ.owner === 0) this.say(`${SITES[s.type].name} eingenommen.`, 'good');
-          else if (old === 0) this.say(`${SITES[s.type].name} an ${this.players[occ.owner].name} verloren!`, 'bad');
+          else if (old === 0) this.say(`${SITES[s.type].name} an die ${FACTIONS[this.fac(occ.owner)].short} verloren!`, 'bad');
         }
       }
       s.manned = s.owner >= 0 && (this.units.some((u) => u.owner === s.owner && this.onMap(u) && !this.flying(u) && distance(u.c, u.r, s.c, s.r) <= 1) ||
@@ -788,6 +942,14 @@ export class Game {
         this.players[s.owner].score += SITES[s.type].pts;
         this.players[s.owner].credits += SITES[s.type].income * (this.players[s.owner].ai ? this.diff.aiCash : 1);
       }
+    }
+    for (const p of humans) {
+      const st = p.stats;
+      const held = (type) => this.sites.some((x) => x.type === type && x.owner === p.id && x.manned && !x.blocked);
+      st.labor = held('labor') ? st.labor + 1 : 0;
+      st.funk = held('funkmast') ? st.funk + 1 : 0;
+      // Sonderorder: Wirt im gelandeten Schiff auf dem Landefeld
+      if (p.faction === 'marines') for (const s of this.units) if (s.owner === p.id && s.type === 'schiff' && s.landed && this.terr(s.c, s.r) === 'pad' && s.cargo.some((id) => { const x = this.units.find((o) => o.id === id); return x && x.host; })) st.wirt = 1;
     }
     // Einkommen
     for (const p of humans) {
@@ -844,6 +1006,26 @@ export class Game {
     this.biomass += (4 + Math.min(14, resinCount * 0.12)) * this.diff.brood;
     this.befall += 1.2;
     this.befall = Math.min(100, this.befall);
+    // Schläfer-Synthetiker
+    for (const u of [...this.units]) {
+      if (u.type !== 'synth' || !u.sleeper || u.owner === 2) continue;
+      const p = this.players[u.owner];
+      const ch = 0.05 * this.stage + (p.score >= this.target * 0.7 ? 0.25 : 0);
+      if (Math.random() < ch) this.defect(u, false);
+    }
+    // Atmosphäreprozessor
+    if (this.core == null && this.befall >= CORE.trigger) {
+      this.core = CORE.start;
+      this.events.push({ type: 'banner', text: 'Prozessor überhitzt', sub: `${this.core} Runden bis zur Kernschmelze` });
+      this.say(`Der Atmosphäreprozessor überhitzt! Techniker, Pioniere oder Synthetiker daneben können ihn kühlen. Sinkt der Befall unter ${CORE.safe} %, beruhigt er sich.`, 'bad');
+    } else if (this.core != null) {
+      if (this.befall < CORE.safe) { this.core = null; this.say('Der Atmosphäreprozessor hat sich stabilisiert.', 'good'); }
+      else {
+        this.core--;
+        if (this.core <= 3 && this.core > 0) this.say(`Kernschmelze in ${this.core} ${this.core === 1 ? 'Runde' : 'Runden'}!`, 'bad');
+        if (this.core <= 0) { this.coreBlown = true; this.say('Kernschmelze im Atmosphäreprozessor. Die Kolonie ist verloren.', 'bad'); }
+      }
+    }
     if (this.stage >= 4 && !this.motherSpawned) {
       const h = this.freeHexNear(this.map.nest.c, this.map.nest.r, 'mutter', 3) || [this.map.nest.c, this.map.nest.r];
       if (!this.unitAt(h[0], h[1])) { this.addUnit(2, 'mutter', h[0], h[1]); this.motherSpawned = true; this.events.push({ type: 'banner', text: 'Die Mutter erwacht', sub: 'Im Wrack regt sich etwas Großes' }); this.say('Im Wrack regt sich etwas Großes. Die Mutter ist erwacht.', 'bad'); }
@@ -855,6 +1037,7 @@ export class Game {
     // Stufenwechsel melden
     const st = this.stage;
     if (st !== this.lastStage) { if (this.lastStage) this.events.push({ type: 'banner', text: `Befall Stufe ${st}`, sub: STAGE_NAMES[st] }); this.lastStage = st; }
+    this.checkObjectives(true);
     this.checkEnd();
   }
   burst(u, carrier) {
@@ -864,7 +1047,7 @@ export class Game {
     this.bursts++; this.befall += 6; this.biomass += 4;
     this.events.push({ type: 'burst', c, r, owner });
     if (owner === 0) this.say(`${name}: Ausbruch! Ein Brutling ist geschlüpft.`, 'bad');
-    else if (this.vis[0] && this.vis[0].seen[this.idx(c, r)]) this.say(`Ausbruch bei den ${this.players[owner].name}!`, 'warn');
+    else if (this.vis[0] && this.vis[0].seen[this.idx(c, r)]) this.say(`Ausbruch bei den ${FACTIONS[this.fac(owner)].short}!`, 'warn');
     if (carrier) this.hurt(carrier, 6, null, 'Ausbruch');
     const h = this.unitAt(c, r) || this.bAt(c, r) ? this.freeHexNear(c, r, 'brutling', 2) : [c, r];
     if (h) { const b = this.addUnit(2, 'brutling', h[0], h[1]); b.lastMove = this.tick; b.revealUntil = this.tick + 3; }
@@ -895,6 +1078,10 @@ export class Game {
 
   checkEnd() {
     if (this.state) return this.state;
+    if (this.coreBlown) {
+      this.state = { kind: 'meltdown' };
+      return this.state;
+    }
     if (this.befall >= 100) {
       this.state = { kind: 'quarantine' };
       this.say('Befall 100 %: Der Orbit verhängt die Quarantäne. Die Kolonie wird sterilisiert.', 'bad');
@@ -914,7 +1101,7 @@ export class Game {
     const enc = (a) => Array.from(a).join(',');
     return JSON.stringify({
       v: 1, seed: this.map.seed, W: this.W, H: this.H, round: this.round, tick: this.tick, nextId: this.nextId, cur: this.cur, order: this.order,
-      players: this.players, units: this.units, buildings: this.buildings, sites: this.sites.map((s) => s.owner), vents: this.vents.map((v) => v.sealed),
+      players: this.players, units: this.units, buildings: this.buildings, sites: this.sites.map((s) => s.owner), vents: this.vents.map((v) => [v.sealed ? 1 : 0, v.sealedBy ?? -1, v.collapsed ? 1 : 0]), charges: this.charges, core: this.core, objOffer: this.objOffer,
       resin: enc(this.resin), fire: enc(this.fire), acid: enc(this.acid), explored: enc(this.explored), ventSeen: [...this.ventSeen], flares: this.flares, blips: this.blips,
       befall: this.befall, biomass: this.biomass, bursts: this.bursts, motherSpawned: this.motherSpawned, storm: this.storm, target: this.target, diff: this.diff, lastStage: this.lastStage, settings: this.settings,
     });
@@ -923,7 +1110,8 @@ export class Game {
     const g = new Game(map, { faction: d.players[0].faction, target: d.target, diff: d.diff });
     Object.assign(g, { round: d.round, tick: d.tick, nextId: d.nextId, cur: d.cur, order: d.order, players: d.players, units: d.units, buildings: d.buildings, flares: d.flares, befall: d.befall, biomass: d.biomass, bursts: d.bursts, motherSpawned: d.motherSpawned, storm: d.storm, lastStage: d.lastStage, settings: d.settings });
     d.sites.forEach((o, i) => { g.sites[i].owner = o; });
-    d.vents.forEach((s, i) => { g.vents[i].sealed = s; });
+    d.vents.forEach((s, i) => { if (Array.isArray(s)) { g.vents[i].sealed = !!s[0]; g.vents[i].sealedBy = s[1]; g.vents[i].collapsed = !!s[2]; } else g.vents[i].sealed = s; });
+    g.charges = d.charges || []; g.core = d.core ?? null; g.objOffer = d.objOffer || [];
     const dec = (s, A) => A.from(s.split(',').map(Number));
     g.resin = dec(d.resin, Uint8Array); g.fire = dec(d.fire, Uint16Array); g.acid = dec(d.acid, Uint16Array); g.explored = dec(d.explored, Uint8Array);
     g.ventSeen = new Set(d.ventSeen); g.blips = d.blips || [];

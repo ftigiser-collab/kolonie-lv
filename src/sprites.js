@@ -47,7 +47,19 @@ function trooper(ctx, col, kit, marine, t, lead) {
   if (marine) { ctx.fillStyle = 'rgba(255,250,200,0.9)'; ell(ctx, 3.2, -1.6, 0.9, 0.9); ctx.fill(); }
   if (lead) { ctx.strokeStyle = col; ctx.lineWidth = 0.8; ell(ctx, 0, 0, 3.6, 3.4); ctx.stroke(); }
 }
+function synthFigure(ctx, col, t) {
+  shadow(ctx, 8, 7, 0.4, 2, 3);
+  ctx.strokeStyle = '#2a2c30'; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(2, 4); ctx.lineTo(13, 4); ctx.stroke();
+  const g = ctx.createLinearGradient(-6, -8, 6, 8); g.addColorStop(0, '#eef0ee'); g.addColorStop(1, '#a8aeb0');
+  ctx.fillStyle = g; ell(ctx, 0, 0, 6, 8); ctx.fill();
+  ctx.fillStyle = col; ctx.fillRect(-5.5, -1, 11, 2);
+  ctx.fillStyle = '#f4f6f4'; ell(ctx, 0.5, 0, 4, 3.8); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.12)'; ell(ctx, -0.5, 1, 3, 2.4); ctx.fill();
+  const a = 0.6 + 0.4 * Math.sin(t * 3);
+  ctx.fillStyle = col === '#a98cff' ? `rgba(200,140,255,${a})` : `rgba(140,220,255,${a})`; ell(ctx, 3.3, -1.2, 1, 1); ctx.fill(); ell(ctx, 3.3, 1.2, 1, 1); ctx.fill();
+}
 export function drawInfantry(ctx, type, col, marine, face, t) {
+  if (type === 'synth') { ctx.save(); ctx.rotate(face); ctx.scale(1.1, 1.1); synthFigure(ctx, col, t); ctx.restore(); return; }
   const kit = KIT[type] || 'rifle';
   const n = type === 'smartgun' || type === 'werfer' || type === 'brenner' ? 2 : 3;
   const spots = n === 3 ? [[5, 0], [-5, -7], [-5, 7]] : [[4, -3], [-5, 5]];

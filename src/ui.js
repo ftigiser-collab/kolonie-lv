@@ -1,6 +1,6 @@
 // Steuerung: Eingabe, Auswahl, Panel, Animation der Ereignisse, Rundenablauf
 import { center, pixelToHex, distance, HW } from './hex.js';
-import { UNITS, BUILDINGS, SITES, TERRAIN, FACTIONS, BUILD_LIST, STAGE_NAMES, HOST_TIME } from './data.js';
+import { UNITS, BUILDINGS, SITES, TERRAIN, FACTIONS, BUILD_LIST, STAGE_NAMES, HOST_TIME, OBJECTIVES, ORBITAL, CHARGE, CORE } from './data.js';
 import { iconCanvas } from './sprites.js';
 import { aiTurn } from './ai.js';
 
@@ -160,6 +160,31 @@ export class Controller {
       case 'hatch': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.ring(p.x, p.y, '#a98cff', 0.8, 30); } break;
       case 'contact': { const p = center(e.c, e.r); r.ring(p.x, p.y, '#ff4a3a', 0.8, 36); r.shake = 4; await sleep(250); break; }
       case 'banner': await this.banner(e.text, e.sub, 1.5); break;
+      case 'scan': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.ring(p.x, p.y, '#9fd8ff', 0.9, 30); await sleep(250 / sp); } break;
+      case 'defect': {
+        const p = center(e.c, e.r);
+        if (!this.seenHex(e.c, e.r) && e.former !== 0) break;
+        await this.ensureVisible(p.x, p.y);
+        r.shake = 6; r.ring(p.x, p.y, '#a98cff', 1.2, 70); r.burst(p.x, p.y, '#e8e8ff', 20, 80, 0.7, 2);
+        r.float(p.x, p.y, 'KONZERNBEFEHL', '#c8b0ff', true);
+        await sleep(900 / sp);
+        break;
+      }
+      case 'cool': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.burst(p.x, p.y, '#bfe8ff', 30, 70, 1.0, 4); r.float(p.x, p.y, 'Kühlung', '#bfe8ff'); await sleep(250 / sp); } break;
+      case 'plant': if (e.owner === 0) { const p = center(e.c, e.r); r.ring(p.x, p.y, '#ff5a3a', 0.6, 20); } break;
+      case 'orbital': case 'charge': {
+        const p = center(e.c, e.r);
+        if (!this.seenHex(e.c, e.r) && e.owner !== 0 && !this.g.near(0, e.c, e.r, 6)) break;
+        await this.ensureVisible(p.x, p.y);
+        if (e.type === 'orbital') {
+          await this.tween(0.5 / sp, (k) => { for (let i = 0; i < 3; i++) r.parts.push({ x: p.x + (Math.random() - 0.5) * 16, y: p.y - 260 * (1 - k) + (Math.random() - 0.5) * 40, vx: 0, vy: 0, t: 0, life: 0.25, col: '#e8f4ff', size: 5 + Math.random() * 4, glow: true }); });
+          r.shake = 16;
+        } else r.shake = 9;
+        r.ring(p.x, p.y, '#fff0d0', 0.7, e.type === 'orbital' ? 120 : 70);
+        r.burst(p.x, p.y, '#ffb04a', 60, 200, 0.9, 4); r.burst(p.x, p.y, '#fff4e0', 30, 120, 0.5, 3); r.burst(p.x, p.y, '#4a4440', 40, 90, 1.6, 6);
+        await sleep(450 / sp);
+        break;
+      }
     }
   }
 
@@ -348,6 +373,7 @@ export class Controller {
     if (u.flares) chips.push(this.chip(`Fackeln ${u.flares}`));
     if (u.host) chips.push(this.chip(`☣ Befallen · ${u.host.t} ${u.host.t === 1 ? 'Runde' : 'Runden'}`, 'bad'));
     if (d.cap) chips.push(this.chip(`Ladung ${g.cargoUsed(u)}/${d.cap}`));
+    if (u.type === 'synth') chips.push(u.defected ? this.chip('Konzernbefehl — übergelaufen', 'bad') : own ? this.chip(u.scanned ? 'Loyalität geprüft ✓' : 'Loyalität ungeprüft', u.scanned ? 'trk' : 'warn') : this.chip('Loyalität unbekannt'));
     if (u.type === 'schiff') chips.push(this.chip(u.landed ? 'gelandet' : 'in der Luft'));
     if (own && g.current.id === 0) chips.push(this.chip(u.acted ? 'fertig' : u.moved ? 'gezogen' : 'bereit', u.acted ? 'dim' : ''));
     let html = this.head('unit', u.type, col, d.name, own ? 'Eigene Einheit' : g.players[u.owner].name, u.hp, d.hp);
@@ -385,6 +411,16 @@ export class Controller {
     if (ht.length) A.push({ id: 'heal', label: '✚ Heilen', tip: 'Verletzte +4, Befallene: +1 Runde (einmalig).', fn: () => ht.length === 1 ? this.run(() => g.heal(u, ht[0])).then(() => this.select(u)) : this.setTarget(ht.map((t) => [t.c, t.r]), (c, r) => { const t = ht.find((x) => x.c === c && x.r === r); if (t) g.heal(u, t); }, 'Wen versorgen?') });
     const rt = g.repairTargets(u);
     if (rt.length) A.push({ id: 'repair', label: '🔧 Instandsetzen', tip: 'Geschütze nachladen, Bauten +6, Fahrzeuge +5.', fn: () => rt.length === 1 ? this.run(() => g.repair(u, rt[0])).then(() => this.select(u)) : this.setTarget(rt.map((t) => [t.c, t.r]), (c, r) => { const t = rt.find((x) => x.c === c && x.r === r); if (t) g.repair(u, t); }, 'Was instand setzen?') });
+    const sc = g.scanTargets(u);
+    if (sc.length) A.push({ id: 'scan', label: '🔍 Synthetiker scannen', tip: 'Zeigt die Loyalität. Steckt ein Konzernbefehl in ihm, wendet er sich sofort gegen euch.', fn: () => this.run(() => g.scan(u, sc[0])).then(() => this.select(u)) });
+    if (g.canCool(u)) A.push({ id: 'cool', label: `❄ Prozessor kühlen (+${CORE.cool})`, fn: () => this.run(() => g.cool(u)).then(() => this.select(u)) });
+    if (d.abil?.includes('orbital')) {
+      const oh = g.orbitalHexes(u), p = g.players[0];
+      const why = p.credits < ORBITAL.cost ? `${ORBITAL.cost} nötig` : g.round < p.orbitalAt ? `bereit in ${p.orbitalAt - g.round} R.` : '';
+      if (!u.acted) A.push({ id: 'orbital', label: `☄ Orbitalschlag${why ? ` (${why})` : ` (${ORBITAL.cost})`}`, cls: why ? 'dim' : 'danger', tip: 'Trifft ein sichtbares Feld in 6 Feldern und alle Nachbarn — auch eigene Einheiten. Brennt Harz weg, verschüttet Schächte.', fn: () => { if (oh.length) this.setTarget(oh, (c, r) => g.orbital(u, c, r), 'Orbitalschlag: Zielfeld wählen (Radius 1, trifft alles)'); else this.logMsg(`Orbitalschlag nicht bereit: ${why || 'kein Ziel in Sicht'}.`, 'warn'); } });
+    }
+    const ch = g.chargeHexes(u);
+    if (ch.length) A.push({ id: 'charge', label: `💣 Sprengladung (${CHARGE.cost})`, tip: 'Zündet am Rundenende: trifft das Feld und alle Nachbarn, verschüttet einen Schacht dauerhaft.', fn: () => this.setTarget(ch, (c, r) => g.charge(u, c, r), 'Sprengladung: Nachbarfeld wählen') });
     const bt = g.burnTargets(u);
     if (bt.length) A.push({ id: 'burn', label: '🔥 Harz abbrennen', fn: () => this.setTarget(bt, (c, r) => g.burn(u, c, r), 'Harzfeld wählen') });
     if (!u.acted) A.push({ id: 'wait', label: '⏸ Warten', cls: 'dim', fn: () => { u.moved = u.acted = true; this.select(u); this.refresh(); } });
@@ -458,7 +494,7 @@ export class Controller {
     const owner = s.owner >= 0 ? g.players[s.owner].name : 'niemand';
     const col = s.owner >= 0 ? FACTIONS[g.fac(s.owner)].color : '#bbb';
     let html = this.head('site', s.type, col, d.name, `Besitzer: ${owner}`);
-    html += `<div class="chips">${this.chip(`${d.pts} ${d.pts === 1 ? 'Punkt' : 'Punkte'} je Runde`)}${this.chip(`+${d.income}`)}${s.owner >= 0 ? this.chip(s.manned ? 'besetzt' : 'unbesetzt — keine Punkte', s.manned ? '' : 'warn') : ''}${s.blocked ? this.chip('von der Brut blockiert', 'bad') : ''}</div>`;
+    html += `<div class="chips">${this.chip(`${d.pts} ${d.pts === 1 ? 'Punkt' : 'Punkte'} je Runde`)}${this.chip(`+${d.income}`)}${s.owner >= 0 ? this.chip(s.manned ? 'besetzt' : 'unbesetzt — keine Punkte', s.manned ? '' : 'warn') : ''}${s.blocked ? this.chip('von der Brut blockiert', 'bad') : ''}${s.type === 'prozessor' && g.core != null ? this.chip(`Überhitzt · Kernschmelze in ${g.core}`, 'bad') : ''}</div>`;
     html += `<div class="p-desc">${d.desc} Einnehmen: am Rundenende mit einer Einheit auf dem Feld stehen, ohne Gegner daneben. Punkte gibt es nur, solange eine eigene Einheit daneben steht oder ein eigenes Geschütz/FOB in 2 Feldern.</div>`;
     const el = $('#panel'); el.innerHTML = html; this.paintIcons(el); el.classList.add('show');
     el.querySelector('[data-act="close"]').onclick = () => this.deselect();
@@ -489,6 +525,7 @@ export class Controller {
     $('#ventbtn').onclick = () => this.toggleVents();
     $('#basebtn').onclick = () => this.jumpHome();
     $('#helpbtn').onclick = () => $('#help').classList.add('show');
+    $('#objbtn').onclick = () => this.showObjective();
     $('#help .close').onclick = () => $('#help').classList.remove('show');
     $('#zoomin').onclick = () => this.r.zoomAt(this.r.vw / 2, this.r.vh / 2, 1.2);
     $('#zoomout').onclick = () => this.r.zoomAt(this.r.vw / 2, this.r.vh / 2, 1 / 1.2);
@@ -541,6 +578,10 @@ export class Controller {
     $('#befall').title = `${STAGE_NAMES[g.stage]} — bei 100 % verhängt der Orbit die Quarantäne: alle verlieren.`;
     $('#befall').classList.toggle('hot', bf >= 75);
     $('#storm').style.display = g.storm.active ? '' : 'none';
+    $('#core').style.display = g.core != null ? '' : 'none';
+    if (g.core != null) $('#core b').textContent = `${g.core} R.`;
+    const pr = g.objProgress(0);
+    if (pr) { $('#objbtn').innerHTML = `🎯 ${pr.done ? '✓' : pr.text.split(' · ')[0]}`; $('#objbtn').classList.toggle('done', pr.done); }
     $('#speedbtn').textContent = `⏩ ${this.speed}×`;
     const mine = g.current.id === 0 && !g.state;
     $('#endturn').disabled = !mine || this.busy;
@@ -579,6 +620,20 @@ export class Controller {
     const hosts = g.units.filter((u) => u.owner === 0 && u.host);
     for (const h of hosts) this.logMsg(`☣ ${UNITS[h.type].name}: noch ${h.host.t} ${h.host.t === 1 ? 'Runde' : 'Runden'} bis zum Ausbruch!`, 'bad');
   }
+  showObjective(pick = false) {
+    const g = this.g, el = $('#objbox'), p = g.players[0];
+    const card = (k, sel) => { const o = OBJECTIVES[k]; return `<button class="objcard ${sel ? 'on' : ''}" data-k="${k}"><b>${o.name}</b><em>+${o.pts} Punkte</em><span>${o.desc}</span></button>`; };
+    let html = `<div class="box"><button class="close">×</button><h2>${pick ? 'Geheimziel wählen' : 'Geheimziel'}</h2>`;
+    if (pick) html += `<p class="m-hint">Nur ihr kennt euer Ziel. Erfüllt bringt es Punkte und 300 ${FACTIONS[p.faction].money}. Die Gegenseite hat ebenfalls eines — ihr erfahrt es erst, wenn sie es erfüllt.</p><div class="objgrid">${g.objOffer.map((k, i) => card(k, i === 0)).join('')}</div>`;
+    else {
+      const pr = g.objProgress(0);
+      html += `<div class="objgrid">${card(p.obj.key, true)}</div><div class="m-label">Fortschritt</div><div class="objprog">${pr.done ? 'Erfüllt ✓' : pr.text}</div><p class="m-hint">Die ${FACTIONS[g.players[1].faction].short} verfolgen ein eigenes, geheimes Ziel${g.players[1].obj?.done ? `: <b>${OBJECTIVES[g.players[1].obj.key].name}</b> (erfüllt)` : '.'}</p>`;
+    }
+    el.innerHTML = html + '</div>';
+    el.classList.add('show');
+    el.querySelector('.close').onclick = () => { if (pick && g.objOffer.length) g.chooseObjective(g.objOffer[0]); el.classList.remove('show'); this.refresh(); };
+    if (pick) el.querySelectorAll('[data-k]').forEach((b) => b.onclick = () => { g.chooseObjective(b.dataset.k); el.classList.remove('show'); this.hooks.save && this.hooks.save(); this.refresh(); this.logMsg(`Geheimziel: ${OBJECTIVES[b.dataset.k].name}`, 'good'); });
+  }
   showEnd() {
     const g = this.g, st = g.state;
     if (!st || this.ended) return;
@@ -586,11 +641,12 @@ export class Controller {
     this.hooks.clearSave && this.hooks.clearSave();
     const el = $('#endscreen');
     let h1, txt;
-    if (st.kind === 'quarantine') { h1 = 'Quarantäne'; txt = 'Der Befall hat 100 % erreicht. Der Orbit sterilisiert die Kolonie — es gibt keine Sieger.'; }
+    if (st.kind === 'meltdown') { h1 = 'Kernschmelze'; txt = 'Der Atmosphäreprozessor ist explodiert. Niemand überlebt — es gibt keine Sieger.'; }
+    else if (st.kind === 'quarantine') { h1 = 'Quarantäne'; txt = 'Der Befall hat 100 % erreicht. Der Orbit sterilisiert die Kolonie — es gibt keine Sieger.'; }
     else if (st.winner === 0) { h1 = 'Sieg'; txt = `${g.players[0].name}: ${st.why}`; }
     else { h1 = 'Niederlage'; txt = `${g.players[st.winner].name}: ${st.why}`; }
     el.querySelector('h1').textContent = h1;
-    el.querySelector('.stats').innerHTML = `${txt}<br>Runde ${g.round} · Punkte ${g.players[0].score}:${g.players[1].score} · Befall ${Math.floor(g.befall)} % · Ausbrüche ${g.bursts}`;
+    el.querySelector('.stats').innerHTML = `${txt}<br>Runde ${g.round} · Punkte ${g.players[0].score}:${g.players[1].score} · Befall ${Math.floor(g.befall)} % · Ausbrüche ${g.bursts}<br>Geheimziel ${OBJECTIVES[g.players[0].obj.key].name}: ${g.players[0].obj.done ? 'erfüllt' : 'nicht erfüllt'} · Gegenseite: ${OBJECTIVES[g.players[1].obj.key].name}${g.players[1].obj.done ? ' (erfüllt)' : ''}`;
     el.classList.add('show');
   }
 }

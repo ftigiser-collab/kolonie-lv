@@ -1,5 +1,5 @@
 // KI: Gegnerfraktion (Siedler oder Marines) und die Brut als Umweltgefahr
-import { UNITS, BUILDINGS, SITES, BROOD } from './data.js';
+import { UNITS, BUILDINGS, SITES, BROOD, ORBITAL, CORE } from './data.js';
 import { distance, neighbors, ring } from './hex.js';
 
 export function* aiTurn(g, pid) {
@@ -54,6 +54,7 @@ function buyPhase(g, pid) {
       if (count('schiff') < 2 && p.credits > 1900 && g.buildings.some((b) => b.owner === pid && b.type === 'fob')) type = 'schiff';
       else type = pick(bag);
     }
+    if (g.round >= 6 && p.credits >= 560 && !count('synth') && Math.random() < 0.35) type = 'synth';
     const reserve = g.round > 3 ? 120 : 0;
     if (p.credits - UNITS[type].cost < reserve) {
       const cheap = f === 'siedler' ? 'miliz' : 'schuetze';
@@ -101,6 +102,8 @@ function objectiveOf(g, u, ctx) {
     pts.sort((a, b) => distance(a.c, a.r, u.c, u.r) - distance(b.c, b.r, u.c, u.r));
     return { c: pts[0].c, r: pts[0].r, kind: 'ammo' };
   }
+  // Prozessor kühlen
+  if (g.core != null && g.core <= 6 && (d.abil || []).includes('repair')) { const s = g.coreSite(); return { c: s.c, r: s.r, kind: 'cool' }; }
   // Wächter bleibt auf eigenem Ort
   const here = g.siteAt(u.c, u.r);
   if (here && (here.owner === pid || here.owner === -1) && d.cls !== 'air') return { c: u.c, r: u.r, kind: 'guard' };
@@ -117,13 +120,16 @@ function objectiveOf(g, u, ctx) {
     if (s.owner === pid && occ && occ.owner === pid) continue;
     const n = ctx.assigned.get(s.id) || 0;
     const dd = distance(u.c, u.r, s.c, s.r);
-    const v = (SITES[s.type].pts * 6 + (s.owner === pid ? 2 : s.owner === -1 ? 5 : 7)) / (dd + 4) - n * 0.35;
+    const ok = g.players[pid].obj && !g.players[pid].obj.done ? g.players[pid].obj.key : '';
+    const bonus = (ok === 'labor' && s.type === 'labor') || (ok === 'funk' && s.type === 'funkmast') || (ok === 'minen' && s.type === 'mine') ? 1.7 : 1;
+    const v = (SITES[s.type].pts * 6 + (s.owner === pid ? 2 : s.owner === -1 ? 5 : 7)) * bonus / (dd + 4) - n * 0.35;
     if (!best || v > best.v) best = { v, s };
   }
   // Gegnerische Basis angreifen, wenn stark
   const mine = g.units.filter((x) => x.owner === pid).length;
   const foe = g.players.find((p) => p.faction !== 'brut' && p.id !== pid);
-  if (foe && !foe.out && mine >= 10 && Math.random() < 0.25) {
+  const raidK = g.players[pid].obj && g.players[pid].obj.key === 'zerschlagen' && !g.players[pid].obj.done ? 0.45 : 0.25;
+  if (foe && !foe.out && mine >= 10 && Math.random() < raidK) {
     const fz = g.buildings.find((b) => b.owner === foe.id && (b.type === 'zentrale' || b.type === 'fob'));
     if (fz) return { c: fz.c, r: fz.r, kind: 'raid' };
   }
@@ -138,7 +144,8 @@ function targetValue(g, u, t, from) {
   let v = f.dmg / max * 10 + (f.kill ? 8 : 0) - f.ctr * 0.6;
   if (t.isBld) v += t.type === 'zentrale' ? 3 : t.type === 'fob' ? 3 : BUILDINGS[t.type].sentry ? 2 : 0;
   if (!t.isBld && g.isXeno(t)) v += t.type === 'mutter' ? 6 : t.type === 'ei' ? 3 : 1.5;
-  if (!t.isBld && t.type === 'schiff') v += 2;
+  if (!t.isBld && t.type === 'schiff') v += 2 + (g.players[u.owner].obj?.key === 'abschuss' ? 4 : 0);
+  if (!t.isBld && t.owner === 2 && t.type === 'synth') v += 2;
   if (!t.isBld && t.host) v -= 1;
   return v;
 }
@@ -203,6 +210,27 @@ function actHuman(g, u, ctx) {
 
 function preActions(g, u) {
   const pid = u.owner;
+  // Synthetiker scannen
+  const sc = g.scanTargets(u);
+  if (sc.length && Math.random() < 0.6) { g.scan(u, sc[0]); return true; }
+  // Prozessor kühlen
+  if (g.canCool(u) && g.core <= 7) { g.cool(u); return true; }
+  // Orbitalschlag auf Ansammlungen
+  const oh = g.orbitalHexes(u);
+  if (oh.length && g.players[pid].credits >= ORBITAL.cost) {
+    let best = null;
+    for (const [c, r] of oh) {
+      let v = 0, own = false;
+      for (const [x, y] of ring(c, r, ORBITAL.rad, g.W, g.H)) {
+        const t = g.unitAt(x, y); const b = g.bAt(x, y);
+        if (t) { if (t.owner === pid) own = true; else if (g.visibleTo(pid, t)) v += t.type === 'ei' ? 1 : g.isXeno(t) ? 2.5 : 2; }
+        if (b) { if (b.owner === pid) own = true; else v += 2; }
+        if (g.resin[g.idx(x, y)]) v += 0.3;
+      }
+      if (!own && v >= 5 && (!best || v > best.v)) best = { v, c, r };
+    }
+    if (best) { g.orbital(u, best.c, best.r); return true; }
+  }
   // Sanitäter: Befallene stabilisieren, Verletzte heilen
   const ht = g.healTargets(u);
   if (ht.length) { g.heal(u, ht.sort((a, b) => (b.host ? 10 : 0) - (a.host ? 10 : 0) + a.hp - b.hp)[0]); return true; }
@@ -251,6 +279,12 @@ function postActions(g, u) {
       const hs = g.buildHexes(u, t);
       if (hs.length) { g.build(u, t, ...pick(hs)); return true; }
     }
+  }
+  // Sprengladung an Brutnestern
+  const ch = g.chargeHexes(u);
+  if (ch.length && p.credits > 500) {
+    const hit = ch.find(([c, r]) => ring(c, r, 1, g.W, g.H).filter(([x, y]) => { const t = g.unitAt(x, y); return t && t.owner === 2; }).length >= 2 && !ring(c, r, 1, g.W, g.H).some(([x, y]) => { const t = g.unitAt(x, y); return t && t.owner === pid; }));
+    if (hit) { g.charge(u, ...hit); return true; }
   }
   // Harz abbrennen
   const bt = g.burnTargets(u);
@@ -309,7 +343,7 @@ function* brutTurn(g, pid) {
   const xs = g.units.filter((u) => u.owner === pid && u.type !== 'ei').sort((a, b) => (a.type === 'klammerer' ? 0 : 1) - (b.type === 'klammerer' ? 0 : 1));
   for (const u of xs) {
     if (g.state || !g.units.includes(u)) continue;
-    const did = actXeno(g, u);
+    const did = u.type === 'synth' ? actRogue(g, u) : actXeno(g, u);
     if (did) yield u.id;
   }
 }
@@ -519,4 +553,24 @@ function actXeno(g, x) {
   }
   if (best && (best.h.c !== x.c || best.h.r !== x.r)) { g.moveUnit(x, best.h.c, best.h.r, reach); return true; }
   return false;
+}
+
+// Übergelaufener Synthetiker: greift den nächsten Menschen an
+function actRogue(g, x) {
+  const ts = prey(g, x);
+  if (!ts.length) return false;
+  const reach = g.reachable(x);
+  let best = null;
+  for (const [, h] of reach) {
+    if (!h.end) continue;
+    const tg = g.targetsFrom(x, h.c, h.r, false).filter((t) => !t.isBld);
+    const n = ts.reduce((b, t) => Math.min(b, distance(h.c, h.r, t.c, t.r)), 99);
+    const v = (tg.length ? 6 : 0) - n * 0.5 + Math.random() * 0.3;
+    if (!best || v > best.v) best = { v, h };
+  }
+  if (best && (best.h.c !== x.c || best.h.r !== x.r)) g.moveUnit(x, best.h.c, best.h.r, reach);
+  if (!g.units.includes(x)) return true;
+  const tg = g.targetsFrom(x, x.c, x.r, false);
+  if (tg.length) g.attack(x, tg.sort((a, b) => a.hp - b.hp)[0]);
+  return true;
 }
