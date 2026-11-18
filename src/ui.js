@@ -92,15 +92,17 @@ export class Controller {
           for (let i = 0; i < n; i++) {
             const jx = (Math.random() - 0.5) * 10, jy = (Math.random() - 0.5) * 10;
             if (flame) {
+              r.flash(ap.x, ap.y, 110, '#ff9a3a', 0.5, 0.45); r.flash(tp.x, tp.y, 90, '#ff7a2a', 0.6, 0.4);
               for (let k = 0; k < 26; k++) { const f = Math.random(); r.parts.push({ x: ap.x + (tp.x - ap.x) * f * 0.3, y: ap.y + (tp.y - ap.y) * f * 0.3, vx: (tp.x - ap.x) * (1.6 + Math.random()), vy: (tp.y - ap.y) * (1.6 + Math.random()), t: 0, life: 0.35 + Math.random() * 0.2, col: Math.random() < 0.5 ? '#ff7a1a' : '#ffd25a', size: 3 + Math.random() * 3, glow: true }); }
             } else {
               const col = type === 'werfer' ? '#ffd0a0' : FACTIONS[g.fac(a.owner)].color === '#72b6f0' ? '#cfe8ff' : '#ffe7a0';
               r.tracer(ap, { x: tp.x + jx, y: tp.y + jy }, col, type === 'werfer' ? 3 : 1.6);
+              r.flash(ap.x, ap.y, 70, '#ffe2a8', 0.1, 0.4);
               r.parts.push({ x: ap.x + Math.cos(a.face || a.aim || 0) * 14, y: ap.y + Math.sin(a.face || a.aim || 0) * 14, vx: 0, vy: 0, t: 0, life: 0.08, col: '#fff2b0', size: 5, glow: true });
             }
             await sleep(60 / sp);
           }
-          if (type === 'werfer' || type === 'panzerwagen' || type === 'schiff') r.burst(tp.x, tp.y, '#ffb04a', 16, 80, 0.5, 2.5);
+          if (type === 'werfer' || type === 'panzerwagen' || type === 'schiff') { r.burst(tp.x, tp.y, '#ffb04a', 16, 80, 0.5, 2.5); r.flash(tp.x, tp.y, 120, '#ffb04a', 0.3, 0.5); }
         }
         const hitXeno = !t.isBld && g.isXeno(t);
         r.burst(tp.x, tp.y, hitXeno ? '#9dff6a' : t.isBld ? '#c8c0b0' : '#ff8a6a', 8, 50, 0.4, 1.8);
@@ -120,19 +122,19 @@ export class Controller {
       case 'die': {
         if (!this.seenHex(e.c, e.r) && e.owner !== 0) break;
         const p = center(e.c, e.r);
-        if (e.bld) { r.burst(p.x, p.y, '#a09080', 40, 90, 1.1, 4); r.burst(p.x, p.y, '#ff9a3a', 18, 70, 0.6, 3); r.shake = 6; }
-        else if (e.xeno) { r.burst(p.x, p.y, '#9dff6a', 26, 90, 0.8, 2.6); r.burst(p.x, p.y, '#1a1d28', 12, 50, 0.6, 3); }
-        else if (['lademech', 'schlepper', 'panzerwagen', 'schiff'].includes(e.kind)) { r.burst(p.x, p.y, '#ffb04a', 36, 120, 0.8, 3.5); r.burst(p.x, p.y, '#3a3632', 26, 60, 1.4, 5); r.shake = 9; }
-        else r.burst(p.x, p.y, '#8a6a5a', 12, 40, 0.6, 2);
+        if (e.bld) { r.burst(p.x, p.y, '#a09080', 40, 90, 1.1, 4); r.burst(p.x, p.y, '#ff9a3a', 18, 70, 0.6, 3); r.shake = 6; r.flash(p.x, p.y, 160, '#ffa040', 0.5, 0.5); r.decal('scorch', p.x, p.y, 1.2); r.decal('rubble', p.x, p.y); }
+        else if (e.xeno) { r.burst(p.x, p.y, '#9dff6a', 26, 90, 0.8, 2.6); r.burst(p.x, p.y, '#1a1d28', 12, 50, 0.6, 3); r.flash(p.x, p.y, 70, '#9dff6a', 0.4, 0.3); r.decal('acid', p.x, p.y, e.kind === 'mutter' ? 2 : e.kind === 'brecher' ? 1.4 : 1); }
+        else if (['lademech', 'schlepper', 'panzerwagen', 'schiff'].includes(e.kind)) { r.burst(p.x, p.y, '#ffb04a', 36, 120, 0.8, 3.5); r.burst(p.x, p.y, '#3a3632', 26, 60, 1.4, 5); r.shake = 9; r.flash(p.x, p.y, 200, '#ffa040', 0.6, 0.6); r.decal('wreck', p.x, p.y, e.kind === 'schiff' ? 1.5 : 1); }
+        else { r.burst(p.x, p.y, '#8a6a5a', 12, 40, 0.6, 2); r.decal('blood', p.x, p.y); }
         await sleep(150 / sp);
         break;
       }
-      case 'acid': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.burst(p.x, p.y, '#b6ff7a', 20, 110, 0.7, 2, 60); r.float(p.x, p.y + 10, 'Säure!', '#9dff6a'); } break;
+      case 'acid': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.burst(p.x, p.y, '#b6ff7a', 20, 110, 0.7, 2, 60); r.decal('acid', p.x, p.y, 1.3); r.float(p.x, p.y + 10, 'Säure!', '#9dff6a'); } break;
       case 'burst': {
         const p = center(e.c, e.r);
         if (!this.seenHex(e.c, e.r) && e.owner !== 0) break;
         await this.ensureVisible(p.x, p.y);
-        r.shake = 12; r.burst(p.x, p.y, '#c8243a', 40, 130, 0.9, 3, 80); r.burst(p.x, p.y, '#e8c0a8', 14, 60, 0.6, 2);
+        r.shake = 12; r.burst(p.x, p.y, '#c8243a', 40, 130, 0.9, 3, 80); r.decal('blood', p.x, p.y, 1.5); r.decal('blood', p.x + 6, p.y - 4); r.burst(p.x, p.y, '#e8c0a8', 14, 60, 0.6, 2);
         r.float(p.x, p.y, 'AUSBRUCH!', '#ff4a4a', true);
         await sleep(800 / sp);
         break;
@@ -143,11 +145,11 @@ export class Controller {
         const a = center(...e.from), b = center(e.c, e.r);
         if (e.owner !== 0 && !this.seenHex(e.c, e.r)) break;
         await this.tween(0.35 / sp, (k) => { const x = a.x + (b.x - a.x) * k, y = a.y + (b.y - a.y) * k - Math.sin(k * Math.PI) * 50; r.parts.push({ x, y, vx: 0, vy: 0, t: 0, life: 0.3, col: '#ffb08a', size: 2.5, glow: true }); });
-        r.ring(b.x, b.y, '#ffd0b0', 0.9, 60); r.burst(b.x, b.y, '#fff0e0', 20, 60, 0.6, 2.5);
+        r.ring(b.x, b.y, '#ffd0b0', 0.9, 60); r.burst(b.x, b.y, '#fff0e0', 20, 60, 0.6, 2.5); r.flash(b.x, b.y, 260, '#ffb090', 0.7, 0.6);
         break;
       }
       case 'weld': case 'breakvent': if (this.seenHex(e.c, e.r)) { const p = center(e.c, e.r); r.burst(p.x + 14, p.y + 12, '#ffb04a', 24, 70, 0.5, 1.6, 120); if (e.type === 'breakvent') r.shake = 4; await sleep(200 / sp); } break;
-      case 'burn': { const u = this.find(e.id), p = center(e.c, e.r); if (this.seenHex(e.c, e.r)) { const a = u ? r.posOf(u) : p; for (let k = 0; k < 30; k++) r.parts.push({ x: a.x, y: a.y, vx: (p.x - a.x) * (2 + Math.random()), vy: (p.y - a.y) * (2 + Math.random()), t: 0, life: 0.45, col: Math.random() < 0.5 ? '#ff7a1a' : '#ffd25a', size: 3 + Math.random() * 3, glow: true }); await sleep(250); } break; }
+      case 'burn': { const u = this.find(e.id), p = center(e.c, e.r); if (this.seenHex(e.c, e.r)) { r.decal('scorch', p.x, p.y, 0.8); r.flash(p.x, p.y, 120, '#ff8a3a', 0.6, 0.5); const a = u ? r.posOf(u) : p; for (let k = 0; k < 30; k++) r.parts.push({ x: a.x, y: a.y, vx: (p.x - a.x) * (2 + Math.random()), vy: (p.y - a.y) * (2 + Math.random()), t: 0, life: 0.45, col: Math.random() < 0.5 ? '#ff7a1a' : '#ffd25a', size: 3 + Math.random() * 3, glow: true }); await sleep(250); } break; }
       case 'spawn': {
         const u = g.units.find((x) => x.id === e.id); if (!u) break;
         if (u.owner !== 0 && !g.visibleTo(0, u)) break;
@@ -181,6 +183,8 @@ export class Controller {
           r.shake = 16;
         } else r.shake = 9;
         r.ring(p.x, p.y, '#fff0d0', 0.7, e.type === 'orbital' ? 120 : 70);
+        r.flash(p.x, p.y, e.type === 'orbital' ? 520 : 300, '#fff0d0', 0.9, 0.9);
+        r.decal(e.type === 'orbital' ? 'crater' : 'scorch', p.x, p.y, e.type === 'orbital' ? 1.3 : 1.6);
         r.burst(p.x, p.y, '#ffb04a', 60, 200, 0.9, 4); r.burst(p.x, p.y, '#fff4e0', 30, 120, 0.5, 3); r.burst(p.x, p.y, '#4a4440', 40, 90, 1.6, 6);
         await sleep(450 / sp);
         break;

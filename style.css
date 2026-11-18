@@ -185,3 +185,31 @@ button.big { display: block; width: 100%; margin: 8px 0; padding: 11px; font-siz
 .objprog { font-size: 18px; font-weight: 800; color: var(--trk); }
 .p-actions button.danger { background: rgba(160,40,30,0.35); border-color: rgba(255,90,70,0.6); }
 @media (max-width: 520px) { .objgrid { grid-template-columns: 1fr; } }
+
+/* ---------- Grafik-Polish ---------- */
+#topbar { background: linear-gradient(180deg, rgba(16,19,24,0.92), rgba(8,10,13,0.88)); box-shadow: 0 6px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04); }
+#topbar::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, rgba(232,179,32,0.5), rgba(93,255,154,0.35), transparent); }
+.stat .lbl::before { margin-right: 3px; opacity: .8; }
+.stat.cash .lbl::before { content: '⛁'; color: var(--amber); }
+#befall .lbl::before { content: '☣'; color: #a98cff; }
+#befall .bbar { box-shadow: 0 0 8px rgba(169,140,255,0.35); }
+button { background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)); }
+#minimap { border: 1px solid rgba(93,255,154,0.35); box-shadow: 0 0 0 3px rgba(0,0,0,0.5), 0 0 18px rgba(93,255,154,0.15), 0 6px 20px rgba(0,0,0,0.5); }
+#panel { border-left: 3px solid rgba(232,179,32,0.55); background: linear-gradient(180deg, rgba(16,19,24,0.93), rgba(8,10,13,0.9)); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+#panel .p-name { letter-spacing: .02em; }
+.chip { background: rgba(255,255,255,0.05); }
+.msg { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,0.35); animation: msgin .25s ease-out; }
+@keyframes msgin { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: none; } }
+#banner .b-main { border-top: 1px solid rgba(93,255,154,0.25); border-bottom: 1px solid rgba(93,255,154,0.25); }
+.card { transition: transform .12s, border-color .12s; }
+.card:not(.locked):hover { transform: translateY(-2px); border-color: rgba(232,179,32,0.6); }
+#forecast { box-shadow: 0 8px 26px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,90,70,0.15) inset; }
+@media (max-width: 520px) {
+  #topbar { gap: 5px; padding: 5px; }
+  .stat { min-width: 0; }
+  .stat .lbl { font-size: 9px; }
+  #score .sc { padding: 0 5px; } #score .sc b { font-size: 13px; } #score .sc-t { display: none; }
+  #befall { min-width: 66px; } #befall .bbar { width: 62px; }
+  #topbar button { padding: 6px 8px; }
+  #log { top: 92px; }
+}

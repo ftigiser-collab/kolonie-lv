@@ -1,8 +1,9 @@
 // Renderer: Kamera, Gelände, Harz, Dunkelheit, Licht, Melder-Signale, Einheiten, Effekte
-import { center, hexPath, R, HW, VS, distance, corners } from './hex.js';
+import { center, hexPath, R, HW, VS, distance, corners, pixelToHex } from './hex.js';
 import { clamp, rgba, shade, Noise, mulberry32 } from './util.js';
 import { TERRAIN, FACTIONS, UNITS, BUILDINGS, SITES } from './data.js';
 import { drawThing, drawVent, drawScaffold, drawSite } from './sprites.js';
+import { bakeTerrain, paintDecal } from './terrain.js';
 
 const TAU = Math.PI * 2;
 const TRK = '#5dff9a';
@@ -47,92 +48,27 @@ export class Renderer {
 
   // ---------- Gelände vorberechnen ----------
   bake() {
-    const g = this.g, m = g.map, { w, h } = m.size;
-    const cv = document.createElement('canvas'); cv.width = Math.ceil(w); cv.height = Math.ceil(h);
-    const ctx = cv.getContext('2d');
-    const rnd = mulberry32(m.seed + 17), N = new Noise(m.seed + 5);
-    ctx.fillStyle = '#141215'; ctx.fillRect(0, 0, w, h);
-    const T = (c, r) => m.t[r * m.W + c];
-    // Grundfarben
-    for (let r = 0; r < m.H; r++) for (let c = 0; c < m.W; c++) {
-      const k = T(c, r), p = center(c, r), n = N.fbm(c * 0.3, r * 0.3, 3);
-      ctx.fillStyle = shade(TERRAIN[k].col, (n - 0.5) * 0.35);
-      ctx.beginPath(); hexPath(ctx, p.x, p.y, R + 1.2); ctx.fill();
-    }
-    // weiche Übergänge: Farbflecken quer über die Hexgrenzen
-    for (let i = 0; i < m.W * m.H * 3; i++) {
-      const c = Math.floor(rnd() * m.W), r = Math.floor(rnd() * m.H), k = T(c, r);
-      if (k === 'chasm' || k === 'deck' || k === 'pad' || k === 'road') continue;
-      const p = center(c, r), a = rnd() * TAU, d = rnd() * R * 1.1;
-      ctx.fillStyle = rgba(TERRAIN[k].col, 0.35);
-      ctx.beginPath(); ctx.ellipse(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d, 8 + rnd() * 16, 6 + rnd() * 10, rnd() * 3, 0, TAU); ctx.fill();
-    }
-    // Körnung
-    const tile = document.createElement('canvas'); tile.width = tile.height = 128;
-    const tc = tile.getContext('2d'), img = tc.createImageData(128, 128);
-    for (let i = 0; i < 128 * 128; i++) { const v = rnd(); img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v > 0.5 ? 255 : 0; img.data[i * 4 + 3] = Math.abs(v - 0.5) * 50; }
-    tc.putImageData(img, 0, 0);
-    ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, w, h);
-    // Details
-    for (let r = 0; r < m.H; r++) for (let c = 0; c < m.W; c++) {
-      const k = T(c, r), p = center(c, r);
-      ctx.save(); ctx.translate(p.x, p.y);
-      if (k === 'dust') {
-        for (let i = 0; i < 5; i++) { ctx.fillStyle = `rgba(20,16,14,${0.25 + rnd() * 0.2})`; ctx.beginPath(); ctx.ellipse((rnd() - 0.5) * R * 1.4, (rnd() - 0.5) * R * 1.2, 1 + rnd() * 2, 0.8 + rnd() * 1.4, 0, 0, TAU); ctx.fill(); }
-        ctx.strokeStyle = 'rgba(120,105,95,0.12)'; ctx.lineWidth = 1;
-        for (let i = 0; i < 3; i++) { const y = (rnd() - 0.5) * R; ctx.beginPath(); ctx.moveTo(-R * 0.7, y); ctx.quadraticCurveTo(0, y - 3, R * 0.7, y + 2); ctx.stroke(); }
-      } else if (k === 'rock' || k === 'ridge') {
-        const n = k === 'ridge' ? 6 : 7, big = k === 'ridge' ? 1.8 : 1;
-        for (let i = 0; i < n; i++) {
-          const x = (rnd() - 0.5) * R * 1.3, y = (rnd() - 0.5) * R * 1.2, s = (3 + rnd() * 6) * big;
-          ctx.fillStyle = 'rgba(0,0,0,0.45)'; this.blob(ctx, x + 2, y + 3, s, rnd); ctx.fill();
-          ctx.fillStyle = shade(TERRAIN[k].col, 0.1 + rnd() * 0.15); this.blob(ctx, x, y, s, rnd); ctx.fill();
-          ctx.fillStyle = 'rgba(255,240,220,0.08)'; this.blob(ctx, x - s * 0.25, y - s * 0.3, s * 0.5, rnd); ctx.fill();
-        }
-        if (k === 'ridge') { ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5; for (let i = 0; i < 3; i++) { ctx.beginPath(); let x = (rnd() - 0.5) * R, y = (rnd() - 0.5) * R; ctx.moveTo(x, y); for (let j = 0; j < 4; j++) { x += (rnd() - 0.5) * 14; y += (rnd() - 0.5) * 14; ctx.lineTo(x, y); } ctx.stroke(); } }
-      } else if (k === 'chasm') {
-        const gr = ctx.createRadialGradient(0, 0, 2, 0, 0, R); gr.addColorStop(0, '#000'); gr.addColorStop(0.75, '#050406'); gr.addColorStop(1, 'rgba(30,26,30,0.6)');
-        ctx.fillStyle = gr; ctx.beginPath(); hexPath(ctx, 0, 0, R * 0.95); ctx.fill();
-      } else if (k === 'deck') {
-        ctx.save(); ctx.beginPath(); hexPath(ctx, 0, 0, R + 1); ctx.clip();
-        ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1;
-        for (let x = -R; x <= R; x += 13) { ctx.beginPath(); ctx.moveTo(x, -R); ctx.lineTo(x, R); ctx.stroke(); }
-        for (let y = -R; y <= R; y += 13) { ctx.beginPath(); ctx.moveTo(-R, y); ctx.lineTo(R, y); ctx.stroke(); }
-        ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let x = -R; x <= R; x += 13) for (let y = -R; y <= R; y += 13) ctx.fillRect(x + 1.5, y + 1.5, 1.2, 1.2);
-        ctx.restore();
-      } else if (k === 'road') {
-        ctx.strokeStyle = 'rgba(25,20,18,0.35)'; ctx.lineWidth = 3;
-        for (const [x, y] of [[-6, 0], [6, 0]]) { ctx.beginPath(); ctx.moveTo(x - 4, -R * 0.8); ctx.lineTo(x + 4, R * 0.8); ctx.stroke(); }
-      } else if (k === 'wreck') {
-        ctx.strokeStyle = '#3a3346'; ctx.lineCap = 'round';
-        for (let i = 0; i < 4; i++) { ctx.lineWidth = 3 + rnd() * 3; const a = rnd() * TAU; ctx.beginPath(); ctx.arc((rnd() - 0.5) * 20, (rnd() - 0.5) * 20, 12 + rnd() * 14, a, a + 1.5 + rnd()); ctx.stroke(); }
-        ctx.strokeStyle = 'rgba(160,140,200,0.12)'; ctx.lineWidth = 1; for (let i = 0; i < 4; i++) { const a = rnd() * TAU; ctx.beginPath(); ctx.arc((rnd() - 0.5) * 20, (rnd() - 0.5) * 20, 10 + rnd() * 10, a, a + 1.2); ctx.stroke(); }
-      } else if (k === 'pad') {
-        ctx.strokeStyle = 'rgba(230,220,180,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, R * 0.62, 0, TAU); ctx.stroke();
-        ctx.fillStyle = 'rgba(230,220,180,0.3)'; ctx.fillRect(-7, -9, 3, 18); ctx.fillRect(4, -9, 3, 18); ctx.fillRect(-4, -1.5, 8, 3);
-      }
-      ctx.restore();
-    }
-    // Wrackrumpf am Nest
-    { const p = center(m.nest.c, m.nest.r); ctx.save(); ctx.translate(p.x, p.y);
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(8, 10, 70, 34, -0.3, 0, TAU); ctx.fill();
-      ctx.rotate(-0.3);
-      const gr = ctx.createLinearGradient(0, -30, 0, 30); gr.addColorStop(0, '#3d3548'); gr.addColorStop(1, '#17131e');
-      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(-70, 0); ctx.bezierCurveTo(-60, -34, 40, -40, 66, -6); ctx.lineTo(50, 4); ctx.bezierCurveTo(70, 20, 0, 36, -60, 18); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(150,130,190,0.2)'; ctx.lineWidth = 2; for (let i = -50; i < 50; i += 12) { ctx.beginPath(); ctx.moveTo(i, -24); ctx.quadraticCurveTo(i + 6, 0, i, 22); ctx.stroke(); }
-      ctx.fillStyle = '#07060a'; ctx.beginPath(); ctx.ellipse(-8, 4, 14, 7, 0.2, 0, TAU); ctx.fill();
-      ctx.restore(); }
-    // Hexgitter, sehr dezent
-    ctx.strokeStyle = 'rgba(255,255,255,0.045)'; ctx.lineWidth = 1;
-    for (let r = 0; r < m.H; r++) for (let c = 0; c < m.W; c++) { const p = center(c, r); ctx.beginPath(); hexPath(ctx, p.x, p.y, R); ctx.stroke(); }
-    this.base = cv;
-    // Harz-Kacheln
+    const m = this.g.map, { w, h } = m.size;
+    this.base = bakeTerrain(m);
     this.resinTiles = [0, 1, 2].map((v) => this.makeResinTile(v));
-    // Nebelpuffer
     this.fogScale = 0.0625;
     this.fog = document.createElement('canvas'); this.fog.width = Math.ceil(w * this.fogScale); this.fog.height = Math.ceil(h * this.fogScale);
     this.fogKey = '';
+    this.flashes = [];
+    // Dunst-Textur, kachelbar
+    const S = 256, mc = document.createElement('canvas'); mc.width = mc.height = S;
+    const mx = mc.getContext('2d'), img = mx.createImageData(S, S), N = new Noise(77);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const a = x / S * TAU, b = y / S * TAU;
+      const v = N.fbm(Math.cos(a) * 1.6 + 5, Math.sin(a) * 1.6 + Math.cos(b) * 1.6 + Math.sin(b) * 0.7, 4);
+      const k = (y * S + x) * 4; img.data[k] = 150; img.data[k + 1] = 160; img.data[k + 2] = 175; img.data[k + 3] = clamp((v - 0.42) * 420, 0, 255);
+    }
+    mx.putImageData(img, 0, 0);
+    this.mist = mc;
+    this.motes = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), z: 0.4 + Math.random() * 0.8, p: Math.random() * 6 }));
   }
+  decal(kind, x, y, s = 1) { try { paintDecal(this.base, kind, x, y, s); } catch (e) { console.warn(e); } }
+  flash(x, y, rad, col = '#ffd8a0', life = 0.18, a = 0.5) { this.flashes.push({ x, y, rad, col, life, t: 0, a }); }
   blob(ctx, x, y, s, rnd) {
     ctx.beginPath();
     const n = 7;
@@ -169,7 +105,7 @@ export class Renderer {
 
   // ---------- Zeichnen ----------
   draw(dt) {
-    this.t += dt;
+    this.t += dt; this.dt = dt;
     const { ctx, g, cam } = this;
     if (this.camTarget) {
       cam.x += (this.camTarget.x - cam.x) * Math.min(1, dt * 6); cam.y += (this.camTarget.y - cam.y) * Math.min(1, dt * 6);
@@ -264,6 +200,7 @@ export class Renderer {
     // Dunkelheit
     this.drawFog(ctx);
     this.drawLights(ctx, list);
+    this.drawMist(ctx, view);
     // Melder
     this.drawTrackerRing(ctx);
     this.drawBlips(ctx);
@@ -272,11 +209,44 @@ export class Renderer {
     for (const u of list) { const p = this.posOf(u); if (inView(p, 40)) this.drawBadges(ctx, u, p); }
     this.drawFx(ctx, dt);
     if (g.storm.active) this.drawStorm(ctx, dt, view);
+    this.drawMotes(ctx, dt);
+  }
+  drawMist(ctx, v) {
+    const t = this.t;
+    if (!this.mistPat) this.mistPat = ctx.createPattern(this.mist, 'repeat');
+    const pat = this.mistPat;
+    if (!pat.setTransform) return;
+    ctx.save();
+    for (const [sc, sp, a] of [[3.4, 7, 0.06], [6, -4, 0.04]]) {
+      pat.setTransform(new DOMMatrix().translate(t * sp, t * sp * 0.35).scale(sc));
+      ctx.globalAlpha = a; ctx.fillStyle = pat;
+      ctx.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
+    }
+    ctx.restore();
+  }
+  drawMotes(ctx, dt) {
+    ctx.save(); ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const wind = this.g.storm.active ? 0.12 : 0.012;
+    for (const m of this.motes) {
+      m.x = (m.x + dt * wind * m.z + 1) % 1; m.y = (m.y + dt * 0.004 * Math.sin(this.t * 0.3 + m.p) + 1) % 1;
+      const x = m.x * this.vw, y = m.y * this.vh, a = 0.08 + 0.08 * Math.sin(this.t * 0.8 + m.p);
+      ctx.fillStyle = `rgba(220,210,190,${a * m.z})`; ctx.beginPath(); ctx.arc(x, y, m.z * 1.3, 0, TAU); ctx.fill();
+    }
+    if (this.g.storm.active) {
+      this.bolt = Math.max(0, (this.bolt || 0) - dt * 3);
+      if (Math.random() < dt * 0.12) this.bolt = 1;
+      if (this.bolt > 0) { ctx.fillStyle = `rgba(220,230,255,${0.18 * this.bolt * (Math.random() * 0.5 + 0.5)})`; ctx.fillRect(0, 0, this.vw, this.vh); }
+    }
+    ctx.restore();
   }
 
   hpBar(ctx, x, y, f, w = 22) {
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, 4);
-    ctx.fillStyle = f > 0.6 ? '#6fdc6a' : f > 0.3 ? '#ffc040' : '#ff5a40'; ctx.fillRect(x - w / 2, y, w * clamp(f, 0, 1), 2);
+    f = clamp(f, 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(x - w / 2 - 1.5, y - 1.5, w + 3, 5);
+    const col = f > 0.6 ? '#6fdc6a' : f > 0.3 ? '#ffc040' : '#ff5a40';
+    ctx.fillStyle = col; ctx.fillRect(x - w / 2, y, w * f, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - w / 2, y, w * f, 0.8);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; for (let i = 1; i < 4; i++) ctx.fillRect(x - w / 2 + w * i / 4 - 0.4, y, 0.8, 2);
   }
 
   drawUnit(ctx, u, p) {
@@ -285,11 +255,24 @@ export class Renderer {
     ctx.save(); ctx.translate(p.x, p.y);
     if (u.fade != null) ctx.globalAlpha = u.fade;
     const sel = this.hl.sel === u;
-    if (sel) { ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.lineDashOffset = -this.t * 10; ctx.beginPath(); ctx.arc(0, 0, R * 0.78, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
-    if (u.owner !== 2 && !sel) { ctx.fillStyle = rgba(col, 0.16); ctx.beginPath(); ctx.ellipse(0, 4, R * 0.62, R * 0.42, 0, 0, TAU); ctx.fill(); }
+    if (u.dface == null) u.dface = u.face;
+    let df = u.face - u.dface; while (df > Math.PI) df -= TAU; while (df < -Math.PI) df += TAU;
+    u.dface += df * Math.min(1, (this.dt || 0.016) * 10);
+    if (u.owner !== 2) {
+      const gr = ctx.createRadialGradient(0, 4, 2, 0, 4, R * 0.7); gr.addColorStop(0, rgba(col, sel ? 0.32 : 0.2)); gr.addColorStop(1, rgba(col, 0));
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(0, 4, R * 0.7, R * 0.5, 0, 0, TAU); ctx.fill();
+    }
+    if (sel) {
+      const rr = R * 0.8 + Math.sin(this.t * 4) * 1.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4 + this.t * 0.6; ctx.beginPath(); ctx.arc(0, 0, rr, a - 0.3, a + 0.3); ctx.stroke(); }
+      ctx.strokeStyle = rgba(col, 0.55); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, rr - 4, 0, TAU); ctx.stroke();
+    }
+    const d0 = UNITS[u.type];
+    if (d0.cls === 'inf' || d0.cls === 'xeno') ctx.translate(0, Math.sin(this.t * 2.2 + u.id) * 0.6);
     const s = d.cls === 'air' ? 1.3 : d.cls === 'veh' ? 1.3 : d.cls === 'egg' ? 1.3 : 1.45;
     ctx.scale(s, s);
-    drawThing(ctx, 'unit', u.type, col, u.face, this.t + u.id * 0.37, { flying: g.flying(u) });
+    drawThing(ctx, 'unit', u.type, col, u.dface, this.t + u.id * 0.37, { flying: g.flying(u) });
     ctx.restore();
   }
   drawBadges(ctx, u, p) {
@@ -321,7 +304,7 @@ export class Renderer {
       for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++) {
         const i = r * g.W + c;
         let a = 0.975;
-        if (v.seen[i]) a = lit[i] ? 0.06 : 0.36 + storm; else if (g.explored[i]) a = 0.74 + storm;
+        if (v.seen[i]) a = lit[i] ? 0.05 : 0.28 + storm; else if (g.explored[i]) a = 0.7 + storm;
         if (a >= 0.975) continue;
         const p = center(c, r);
         fc.globalCompositeOperation = 'destination-out'; fc.fillStyle = '#000'; fc.beginPath(); hexPath(fc, p.x, p.y, R + 3); fc.fill();
@@ -339,16 +322,23 @@ export class Renderer {
     for (const b of g.buildings) {
       const L = BUILDINGS[b.type].light; if (!L || b.progress || !g.bVisibleTo(0, b)) continue;
       const p = center(b.c, b.r); if (!this.inView(p, 200)) continue;
-      glow(p.x, p.y, L * HW * 1.05, b.type === 'flutlicht' ? '#fff2d0' : '#ffcc88', 0.13);
+      const fl = b.type === 'flutlicht' ? 0.92 + 0.08 * Math.sin(t * 17 + b.id) * Math.sin(t * 5.3 + b.id * 2) : 1;
+      glow(p.x, p.y, L * HW * 1.05, b.type === 'flutlicht' ? '#fff2d0' : '#ffcc88', 0.14 * fl);
+      if (b.type === 'flutlicht') glow(p.x, p.y - 6, 16, '#ffffff', 0.5 * fl);
     }
     for (const f of g.flares) { const p = center(f.c, f.r); const fl = 0.85 + 0.15 * Math.sin(t * 23 + f.c); glow(p.x, p.y, f.rad * HW * 1.25, '#ff8a6a', 0.2 * fl); glow(p.x, p.y, 12, '#fff0e0', 0.8 * fl); }
+    for (const f of this.flashes) { f.t += 1 / 60; const k = 1 - f.t / f.life; if (k > 0) glow(f.x, f.y, f.rad, f.col, f.a * k); }
+    this.flashes = this.flashes.filter((f) => f.t < f.life);
+    // Feuerschein
+    for (let i = 0; i < g.fire.length; i++) if (g.fire[i] >= g.round && g.explored[i]) { const c = i % g.W, rr = Math.floor(i / g.W), p = center(c, rr); if (this.inView(p, 100)) glow(p.x, p.y, HW * 1.4, '#ff8a3a', 0.16 + 0.05 * Math.sin(t * 9 + i)); }
     // Taschenlampen der sichtbaren Trupps
     for (const u of units) {
       if (g.isXeno(u) || UNITS[u.type].cls === 'air') continue;
       const p = this.posOf(u); if (!this.inView(p, 120)) continue;
       const a = u.face, len = HW * 2.2;
       const gr = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, len); gr.addColorStop(0, 'rgba(255,245,215,0.13)'); gr.addColorStop(1, 'rgba(255,245,215,0)');
-      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, len, a - 0.42, a + 0.42); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, len, a - 0.45, a + 0.45); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, len * 0.9, a - 0.22, a + 0.22); ctx.closePath(); ctx.fill();
     }
     ctx.restore();
   }
@@ -389,8 +379,26 @@ export class Renderer {
     const h = this.hl, t = this.t;
     if (layer === 'under') {
       if (h.move) {
-        ctx.fillStyle = 'rgba(80,170,255,0.16)'; ctx.strokeStyle = 'rgba(120,200,255,0.45)'; ctx.lineWidth = 1;
-        for (const [, v] of h.move) { if (!v.end || v.cost === 0) continue; const p = center(v.c, v.r); if (!this.inView(p)) continue; ctx.beginPath(); hexPath(ctx, p.x, p.y, R - 2); ctx.fill(); ctx.stroke(); }
+        if (this.moveKey !== h.move) {
+          this.moveKey = h.move;
+          const set = new Set([...h.move.values()].filter((v) => v.end).map((v) => v.c + ',' + v.r));
+          const edges = [];
+          for (const k of set) {
+            const [c, rr] = k.split(',').map(Number), p = center(c, rr);
+            for (let i = 0; i < 6; i++) {
+              const a1 = Math.PI / 180 * (60 * i - 30), a2 = Math.PI / 180 * (60 * (i + 1) - 30);
+              const ax = p.x + R * Math.cos(a1), ay = p.y + R * Math.sin(a1), bx = p.x + R * Math.cos(a2), by = p.y + R * Math.sin(a2);
+              const q = pixelToHex(p.x + ((ax + bx) / 2 - p.x) * 1.9, p.y + ((ay + by) / 2 - p.y) * 1.9);
+              if (!set.has(q.col + ',' + q.row)) edges.push([ax, ay, bx, by]);
+            }
+          }
+          this.moveEdges = edges;
+        }
+        ctx.fillStyle = 'rgba(90,175,255,0.11)';
+        for (const [, v] of h.move) { if (!v.end || v.cost === 0) continue; const p = center(v.c, v.r); if (!this.inView(p)) continue; ctx.beginPath(); hexPath(ctx, p.x, p.y, R - 1); ctx.fill(); }
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(120,200,255,0.25)'; ctx.lineWidth = 6; ctx.beginPath(); for (const [ax, ay, bx, by] of this.moveEdges) { ctx.moveTo(ax, ay); ctx.lineTo(bx, by); } ctx.stroke();
+        ctx.strokeStyle = 'rgba(170,225,255,0.85)'; ctx.lineWidth = 1.6; ctx.stroke();
       }
       if (h.target.length) {
         const a = 0.18 + 0.08 * Math.sin(t * 5);

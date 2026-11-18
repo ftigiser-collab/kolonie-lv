@@ -53,6 +53,15 @@ Spin-off von [Sandthron](https://github.com/ftigiser-collab/sandthron) im Alien-
 - **Orbitalschlag** (Marines, Unteroffizier, 800, alle 5 Runden) und **Sprengladung** (Siedler, Techniker, 150, zündet am Rundenende): Flächenschaden auf Feld und Nachbarn, brennt Harz weg, verschüttet Schächte dauerhaft.
 - KI nutzt Geheimziele, Synthetiker samt Scan, Kühlung, Orbitalschläge und Sprengladungen.
 
+## Grafik-Update
+- Gelände mit Höhenfeld und Schummerung: weiche Übergänge, Krater, Windrippel, Felsgrate mit Relief, tiefe Spalten
+- Durchgehende Fahrwege, Koloniedeck und Landefeld aus Platten mit Warnstreifen an den Kanten
+- Bleibende Spuren: Säureverätzungen, Blut, Wracks, Trümmer, Brandflecken, Orbitalkrater
+- Dynamisches Licht: Mündungsfeuer, Explosionen, Flammenwerfer, Feuerschein, flackernde Flutlichter, Leuchtfackeln
+- Ziehender Dunst, Staubpartikel, Blitze im Staubsturm
+- Einheiten drehen sich weich, atmen leicht, Trupps mit Rucksack und Fraktionsfarbe am Helm; Bewegungsbereich als Umriss
+- Aufgeräumte Oberfläche, kompakte Kopfzeile auf dem Handy
+
 ## Geplant
 - Mehr Kartentypen (Kolonie im Eis, Raffinerie, Raumstation)
 - Feinbalance nach Testpartien
