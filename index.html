@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Schachtbrut</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+  <div id="vignette"></div>
+  <div id="scan"></div>
+
+  <header id="topbar">
+    <button id="gamemenu" title="Menü">☰</button>
+    <div class="brand">SCHACHTBRUT</div>
+    <div class="stat"><span class="lbl">Runde</span><b id="round">1</b></div>
+    <div class="stat cash"><span class="lbl" id="cashlbl">Vorräte</span><b id="credits">0</b></div>
+    <div id="score"></div>
+    <div id="befall" class="stat"></div>
+    <div id="storm" class="stat" title="Staubsturm: alle sehen 1 Feld weniger" style="display:none"><span class="lbl">Wetter</span><b>Sturm</b></div>
+    <div class="spacer"></div>
+    <button id="basebtn" title="Zur Basis / zum FOB">⌂</button>
+    <button id="ventbtn" title="Schachtnetz zeigen (V)">⌁ Schächte</button>
+    <button id="speedbtn" title="Tempo der gegnerischen Züge">⏩ 1×</button>
+    <button id="helpbtn" title="Hilfe">?</button>
+    <button id="nextunit">Nächste</button>
+    <button id="endturn" class="primary">Runde beenden</button>
+  </header>
+
+  <canvas id="minimap" width="220" height="150"></canvas>
+  <div id="zoom"><button id="zoomin">+</button><button id="zoomout">−</button></div>
+  <div id="seedinfo"></div>
+  <div id="log"></div>
+  <aside id="panel"></aside>
+
+  <div id="forecast">
+    <div class="fc-title">Angriff</div>
+    <div class="fc-row"><span>Schaden</span><b class="fc-dmg">0</b></div>
+    <div class="fc-row"><span>Gegenschlag</span><b class="fc-ctr">0</b></div>
+    <div class="fc-extra"></div>
+    <div class="fc-btns"><button id="fc-no">Abbrechen</button><button id="fc-ok" class="primary">Angreifen</button></div>
+  </div>
+
+  <div id="banner"></div>
+
+  <div id="help">
+    <div class="box">
+      <button class="close">×</button>
+      <h2>So wird gespielt</h2>
+      <p class="lead">Freie Siedler gegen Kolonialmarines um die Schlüsselorte der Kolonie — und die Brut aus dem Wrack frisst sich durch beide.</p>
+      <h3>Steuerung</h3>
+      <ul>
+        <li><b>Antippen:</b> Einheit wählen, blaues Feld antippen zum Ziehen. Rot markierte Ziele: einmal antippen zeigt die Vorschau, nochmal antippen greift an.</li>
+        <li><b>Ziehen</b> verschiebt die Karte, <b>zwei Finger / Mausrad</b> zoomt. Übersichtskarte antippen springt dorthin.</li>
+        <li><b>⌂</b> springt zur Basis, <b>⌁ Schächte</b> zeigt das bekannte Schachtnetz, <b>⏩</b> beschleunigt die gegnerischen Züge.</li>
+        <li>Tastatur: <b>E</b> Runde beenden, <b>N</b> nächste Einheit, <b>V</b> Schächte, <b>Esc</b> abbrechen, <b>Leertaste</b> Angriff bestätigen, <b>WASD</b> Karte.</li>
+      </ul>
+      <h3>Der Bewegungsmelder</h3>
+      <ul>
+        <li><b>Es ist dunkel.</b> Menschliche Gegner seht ihr in Sichtweite. Die Brut seht ihr nur aus <b>2 Feldern Nähe</b> oder in <b>Licht</b> (Flutlicht, Leuchtfackel, Feuer).</li>
+        <li><b>Grüne Signale</b> zeigen alles, was sich seit eurem letzten Zug im Melderbereich bewegt hat und nicht zu sehen ist: Brut, feindliche Trupps — oder ein <b>Fehlalarm</b>. Ihr wisst nie genau, was es ist.</li>
+        <li><b>Gestrichelte, verschwommene Signale</b> kommen aus den Schächten: Die Richtung ist ungenau.</li>
+        <li>Wer <b>still hält, sendet kein Signal</b>. Die Brut weiß das und lauert.</li>
+        <li>Melder haben: Marines alle (3 Felder), Unteroffizier 7, Späher 6, Schlepper und Panzerwagen, Landungsschiff 7, Zentrale/FOB 6, Wachgeschütz 4, Sensormast 8, Funkmast 9 (für den Besitzer).</li>
+        <li>Läuft ihr in etwas Unsichtbares hinein, stoppt der Zug: <b>Kontakt!</b></li>
+      </ul>
+      <h3>Schächte</h3>
+      <ul>
+        <li>Unter der Kolonie liegt ein Netz aus Lüftungsschächten. Die Brut taucht dort ab, kriecht weiter und taucht anderswo wieder auf — mit 2 Feldern Bewegung und Angriff.</li>
+        <li>Die <b>Siedler kennen das ganze Netz</b> von Beginn an, die Marines nur die Schächte, die sie gesehen haben.</li>
+        <li><b>Verschweißen</b> (Techniker, Pionier, daneben stehend): Der Knoten ist dicht, auch für die Durchreise. Jäger und Brecher brechen ihn wieder auf.</li>
+        <li>Infanterie kann selbst durch einen Schacht kriechen: Siedler 2 Knoten weit, Marines 1.</li>
+      </ul>
+      <h3>Die Brut</h3>
+      <ul>
+        <li><b>Eier</b> öffnen sich, wenn Infanterie bis auf 2 Felder herankommt. <b>Klammerer</b> springen Trupps an: Der Trupp ist <b>befallen</b> und hat 3 Runden.</li>
+        <li><b>Heilung:</b> Siedler am Rundenende neben der Krankenstation, Marines neben dem Sanitätszelt oder im gelandeten Landungsschiff. Der Sanitäter verschafft einmalig +1 Runde. Sonst: <b>Ausbruch</b> — der Trupp stirbt, ein Brutling schlüpft und wächst in 2 Runden zum Läufer oder Jäger heran.</li>
+        <li><b>Säureblut:</b> Stirbt ein Brutwesen, verätzt es alle Nachbarfelder (2 Schaden, Fahrzeuge 3) und das Feld bleibt 2 Runden ätzend.</li>
+        <li><b>Harz</b> breitet sich aus, auch durch die Schächte: Menschen kommen schwerer durch, die Brut regeneriert dort. Der <b>Brenner</b> brennt Harz und Eier weg.</li>
+        <li><b>Befall</b> steigt mit der Zeit, mit Harz, Ausbrüchen und gefallenen Menschen; er sinkt mit jedem getöteten Brutwesen und abgebranntem Harz. Stufen: 1 Läufer, 2 Jäger, 3 Brecher, 4 die Mutter. <b>Bei 100 % verhängt der Orbit die Quarantäne — alle verlieren.</b> Die Mutter zu töten senkt den Befall um 15.</li>
+        <li>Die Brut greift auch Bauten an. Fällt ein Wohnmodul, werden die Bewohner eingesponnen. Flutlichter hasst sie besonders.</li>
+      </ul>
+      <h3>Sieg</h3>
+      <ul>
+        <li><b>Schlüsselorte:</b> Atmosphäreprozessor (2 Punkte), Funkmast, Labor, zwei Erzminen (je 1). Einnehmen: am Rundenende auf dem Feld stehen, ohne Gegner daneben.</li>
+        <li>Punkte gibt es je Runde nur für <b>besetzte</b> Orte: eigene Einheit daneben oder eigenes Wachgeschütz/FOB in 2 Feldern. Unbesetzte Orte zeigen einen gestrichelten Ring.</li>
+        <li>Wer zuerst das Punkteziel erreicht, gewinnt. Oder: Die Kolonie-Zentrale fällt (Siedler) bzw. die Marines verlieren alle Einheiten ohne FOB.</li>
+      </ul>
+      <h3>Die Seiten</h3>
+      <ul>
+        <li><b>Freie Siedler:</b> feste Basis rund um die Kolonie-Zentrale. Infanterie aus der Zentrale, Lademech und Raupenschlepper aus der Werkstatt. Der Techniker baut im Umkreis von 3 Feldern um eigene Bauten (und 2 um eigene Orte). Keine Munitionssorgen. Wohnmodule bringen Vorräte.</li>
+        <li><b>Kolonialmarines:</b> keine Basis. Nachschub landet neben <b>gelandeten Landungsschiffen</b> (2 je Runde) und <b>FOBs</b> (3 je Runde). Der Pionier errichtet FOBs (mindestens 5 Felder auseinander, höchstens 3) und baut im Umkreis von 2. Munition wird am FOB, am gelandeten Schiff und auf dem Landefeld aufgefüllt.</li>
+        <li><b>Landungsschiffe</b> fliegen über alles. Nur gelandet nehmen sie auf, setzen ab und dienen als Nachschubpunkt — Landen beendet den Zug, gelandet sind sie angreifbar, auch von der Brut. Ein neues Schiff gibt es nur mit FOB (höchstens 2).</li>
+        <li><b>Reaktionsfeuer:</b> Wachgeschütze feuern auf alles Fremde in 3 Feldern (Munition begrenzt). Smartgunner, die in ihrem Zug nicht geschossen haben, feuern einmal auf Gegner, die in Reichweite ziehen.</li>
+        <li><b>Gegenschlag:</b> Wer angegriffen wird und den Angreifer erreicht, schlägt mit 75 % zurück.</li>
+        <li><b>Staubsturm:</b> Alle sehen 1 Feld weniger — der Melder wird wichtiger.</li>
+      </ul>
+      <h3>Legende</h3>
+      <ul class="legend">
+        <li>LP = Lebenspunkte · Rw = Reichweite · Bew = Bewegung · Mun = Munition</li>
+        <li>FOB = vorgeschobener Stützpunkt (Forward Operating Base)</li>
+        <li>☣ = befallen, Zahl = Runden bis zum Ausbruch</li>
+        <li>Grüner Punkt = Melder-Signal · gestrichelter grüner Kreis = Signal aus dem Schacht</li>
+        <li>Farbiger Ring um einen Ort = Besitzer · durchgezogen besetzt, gestrichelt unbesetzt</li>
+        <li>Gitter mit orangem Kreuz = verschweißter Schacht</li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="endscreen">
+    <h1>Ende</h1>
+    <div class="stats"></div>
+    <div class="ebtns"><button class="primary" onclick="location.reload()">Hauptmenü</button></div>
+  </div>
+
+  <div id="gmenu" class="ovl"></div>
+  <div id="setup" class="ovl"></div>
+
+  <div id="menu">
+    <canvas id="menubg"></canvas>
+    <div class="m-box">
+      <div class="m-title">SCHACHTBRUT</div>
+      <div class="m-sub">Rundenstrategie im Dunkeln</div>
+      <p class="m-text">Die Freien Siedler haben sich gegen die Verwaltung erhoben. Die Kolonialmarines landen, um den Aufstand niederzuschlagen. Und im alten Wrack am Rand der Kolonie ist etwas aufgewacht, das sich durch die Schächte frisst — gegen alle.</p>
+      <button id="start" class="primary big">Neues Gefecht</button>
+      <button id="continue" class="big" style="display:none">Fortsetzen</button>
+      <button id="loadbtn" class="big">Spielstände</button>
+      <button id="mhelp" class="big">Anleitung</button>
+      <div class="loading">Die Kolonie wird vermessen …</div>
+      <div class="m-ver">Alien-Spin-off von Sandthron · Stufe 1</div>
+    </div>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
