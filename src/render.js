@@ -209,7 +209,7 @@ export class Renderer {
     this.drawFog(ctx);
     this.drawLights(ctx, list);
     this.drawMist(ctx, view);
-    for (const gs of this.ghosts) { ctx.save(); ctx.translate(gs.x, gs.y); ctx.scale(1.3, 1.3); drawSchiff(ctx, gs.col, gs.face, this.t, gs.alt > 0.05, gs.alt); ctx.restore(); if (gs.alt > 0.05) { const gr = ctx.createRadialGradient(gs.x, gs.y + 40 * gs.alt, 0, gs.x, gs.y + 40 * gs.alt, 90); gr.addColorStop(0, 'rgba(255,250,230,0.08)'); gr.addColorStop(1, 'rgba(255,250,230,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(gs.x, gs.y + 40 * gs.alt, 90, 0, TAU); ctx.fill(); } }
+    for (const gs of this.ghosts) { ctx.save(); ctx.translate(gs.x, gs.y); ctx.scale(1.65, 1.65); drawSchiff(ctx, gs.col, gs.face, this.t, gs.alt > 0.05, gs.alt, { ramp: gs.ramp || 0, gear: gs.gear || 0, seed: gs.seed || 3 }); ctx.restore(); if (gs.alt > 0.05) { const gr = ctx.createRadialGradient(gs.x, gs.y + 40 * gs.alt, 0, gs.x, gs.y + 40 * gs.alt, 90); gr.addColorStop(0, 'rgba(255,250,230,0.08)'); gr.addColorStop(1, 'rgba(255,250,230,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(gs.x, gs.y + 40 * gs.alt, 90, 0, TAU); ctx.fill(); } }
     this.drawHighlights(ctx, 'dark');
     // Melder
     this.drawTrackerRing(ctx);
@@ -280,15 +280,15 @@ export class Renderer {
     }
     const d0 = UNITS[u.type];
     if (d0.cls === 'inf' || d0.cls === 'xeno') ctx.translate(0, Math.sin(this.t * 2.2 + u.id) * 0.6);
-    const s = d.cls === 'air' ? 1.3 : d.cls === 'veh' ? 1.3 : d.cls === 'egg' ? 1.3 : 1.45;
+    const s = d.cls === 'air' ? 1.65 : d.cls === 'veh' ? 1.3 : d.cls === 'egg' ? 1.3 : 1.45;
     ctx.scale(s, s);
-    drawThing(ctx, 'unit', u.type, col, u.dface, this.t + u.id * 0.37, { flying: g.flying(u) });
+    drawThing(ctx, 'unit', u.type, col, u.dface, this.t + u.id * 0.37, { flying: g.flying(u), ramp: u.landed ? (u.rampVis ?? 1) : 0, gear: u.landed ? 1 : 0, seed: u.id });
     ctx.restore();
   }
   drawBadges(ctx, u, p) {
     const g = this.g, d = UNITS[u.type];
     if (g.isXeno(u) && u.type === 'ei') return;
-    const y0 = p.y + (d.cls === 'air' ? 28 : 24);
+    const y0 = p.y + (d.cls === 'air' ? 36 : 24);
     if (u.hp < d.hp || u.owner === 0) this.hpBar(ctx, p.x, y0, u.hp / d.hp, d.cls === 'xeno' ? 18 : 22);
     if (u.owner === 0 && u.moved && u.acted && g.current.id === 0) { ctx.fillStyle = 'rgba(10,10,14,0.35)'; ctx.beginPath(); ctx.arc(p.x, p.y, R * 0.55, 0, TAU); ctx.fill(); }
     let bx = p.x + 14;

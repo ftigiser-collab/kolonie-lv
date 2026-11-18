@@ -212,22 +212,26 @@ export class Controller {
     if (owner === 0 || this.seenHex(c, r)) await this.ensureVisible(land.x, land.y);
     for (const x of us) x.animHide = true;
     const col = FACTIONS[g.fac(owner)].color;
-    const gs = { x: start.x, y: start.y, face: Math.atan2(land.y - start.y, land.x - start.x), alt: 1, col };
+    const gs = { x: start.x, y: start.y, face: Math.atan2(land.y - start.y, land.x - start.x), alt: 1, col, ramp: 0, gear: 0, seed: (c * 31 + r * 7) % 97 + 1 };
+    const dust = (k) => { if (Math.random() < k) R.parts.push({ x: gs.x + (Math.random() - 0.5) * 70, y: gs.y + (Math.random() - 0.5) * 60, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80, t: 0, life: 1.4, col: '#9a8a7a', size: 6 + Math.random() * 6, grow: 10, fade: 0.22, soft: true }); };
     R.ghosts.push(gs);
     const ease = (k) => 1 - (1 - k) ** 3;
-    await this.tween(1.3 / sp, (k) => { const e = ease(k); gs.x = start.x + (land.x - start.x) * e; gs.y = start.y + (land.y - start.y) * e; gs.alt = isShip ? 1 : k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45; });
+    await this.tween(1.4 / sp, (k) => { const e = ease(k); gs.x = start.x + (land.x - start.x) * e; gs.y = start.y + (land.y - start.y) * e; gs.alt = isShip ? 1 : k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45; gs.gear = isShip ? 0 : Math.max(0, 1 - gs.alt / 0.4); if (!isShip && gs.alt < 0.45) { dust(0.9); dust(0.6); } });
     if (isShip) {
       R.ghosts = R.ghosts.filter((x) => x !== gs);
       for (const x of us) { x.animHide = false; x.face = gs.face; x.dface = gs.face; }
       return;
     }
     R.burst(land.x, land.y, '#9a8a7a', 30, 90, 0.9, 4); R.ring(land.x, land.y, '#c8b898', 0.6, 40); R.shake = Math.max(R.shake, 3);
+    for (let i = 0; i < 12; i++) dust(1);
+    await this.tween(0.35 / sp, (k) => { gs.ramp = k; });
     for (const x of us) { x.animHide = false; x.fade = 0; }
-    await this.tween(0.35 / sp, (k) => { for (const x of us) x.fade = k; });
+    await this.tween(0.4 / sp, (k) => { for (const x of us) x.fade = k; });
     for (const x of us) x.fade = null;
-    await sleep(150 / sp);
+    await sleep(120 / sp);
+    await this.tween(0.3 / sp, (k) => { gs.ramp = 1 - k; });
     const from = { x: gs.x, y: gs.y };
-    await this.tween(1.1 / sp, (k) => { gs.alt = Math.min(1, k * 2.5); const e = k * k; gs.x = from.x + (exit.x - from.x) * e; gs.y = from.y + (exit.y - from.y) * e; gs.face = Math.atan2(exit.y - from.y, exit.x - from.x) * Math.min(1, k * 3) + gs.face * (1 - Math.min(1, k * 3)); });
+    await this.tween(1.1 / sp, (k) => { gs.alt = Math.min(1, k * 2.5); gs.gear = Math.max(0, 1 - gs.alt / 0.4); if (gs.alt < 0.45) dust(0.8); const e = k * k; gs.x = from.x + (exit.x - from.x) * e; gs.y = from.y + (exit.y - from.y) * e; gs.face = Math.atan2(exit.y - from.y, exit.x - from.x) * Math.min(1, k * 3) + gs.face * (1 - Math.min(1, k * 3)); });
     R.ghosts = R.ghosts.filter((x) => x !== gs);
   }
   async playIntro() {

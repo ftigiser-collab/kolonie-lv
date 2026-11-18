@@ -155,7 +155,24 @@ export function drawPanzerwagen(ctx, col, face, t) {
   ctx.fillStyle = `rgba(90,255,150,${0.5 + 0.5 * Math.sin(t * 6)})`; ell(ctx, -7, 0, 1.3, 1.3); ctx.fill();
   ctx.restore();
 }
-export function drawSchiff(ctx, col, face, t, flying, alt = null) {
+function shipWear(ctx, seed) {
+  let a = seed * 9301 + 49297; const rnd = () => { a = (a * 9301 + 49297) % 233280; return a / 233280; };
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(24, -3); ctx.lineTo(19, -8); ctx.lineTo(-20, -8); ctx.lineTo(-23, -5); ctx.lineTo(-23, 5); ctx.lineTo(-20, 8); ctx.lineTo(19, 8); ctx.lineTo(24, 3); ctx.closePath(); ctx.clip();
+  // Schmutzschlieren nach hinten
+  for (let i = 0; i < 7; i++) { const y = -7 + rnd() * 14, x = -18 + rnd() * 30; const g = ctx.createLinearGradient(x, y, x - 10, y); g.addColorStop(0, 'rgba(30,26,20,0.35)'); g.addColorStop(1, 'rgba(30,26,20,0)'); ctx.fillStyle = g; ctx.fillRect(x - 10, y - 0.6, 10, 1.2 + rnd()); }
+  // Kratzer
+  ctx.strokeStyle = 'rgba(210,215,220,0.35)'; ctx.lineWidth = 0.35;
+  for (let i = 0; i < 9; i++) { const x = -20 + rnd() * 38, y = -7 + rnd() * 14, l = 1.5 + rnd() * 4, an = (rnd() - 0.5) * 1.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(an) * l, y + Math.sin(an) * l); ctx.stroke(); }
+  // Einschläge und Brandspuren
+  for (let i = 0; i < 3; i++) { const x = -16 + rnd() * 30, y = -6 + rnd() * 12; const g = ctx.createRadialGradient(x, y, 0, x, y, 2.5); g.addColorStop(0, 'rgba(10,8,6,0.8)'); g.addColorStop(1, 'rgba(10,8,6,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(200,200,200,0.4)'; ctx.beginPath(); ctx.arc(x - 0.4, y - 0.4, 0.5, 0, TAU); ctx.fill(); }
+  // Rostläufer an den Nieten
+  ctx.fillStyle = 'rgba(120,70,30,0.3)'; for (let i = 0; i < 5; i++) { const x = -18 + rnd() * 34, y = -7.5 + rnd() * 2; ctx.fillRect(x, y, 0.8, 2 + rnd() * 3); }
+  // abgeplatzte Farbe an den Kanten
+  ctx.fillStyle = 'rgba(150,155,160,0.5)'; for (let i = 0; i < 6; i++) { const x = -20 + rnd() * 38; ctx.fillRect(x, rnd() < 0.5 ? -8 : 7.2, 1 + rnd() * 2, 0.8); }
+  ctx.restore();
+}
+export function drawSchiff(ctx, col, face, t, flying, alt = null, o = {}) {
   // eigenes Design: schwerer Senkrechtstarter mit vier Mantelschrauben, Heckrampe, Waffenträgern
   const h = alt == null ? (flying ? 1 : 0) : alt;
   ctx.save();
@@ -164,15 +181,36 @@ export function drawSchiff(ctx, col, face, t, flying, alt = null) {
   rr(ctx, -22, -8, 44, 16, 4); ctx.fill(); for (const [x, y] of [[14, -14], [14, 14], [-14, -14], [-14, 14]]) { ell(ctx, x, y, 7, 7); ctx.fill(); }
   ctx.restore();
   ctx.rotate(face); ctx.scale(sc, sc);
+  const ramp = o.ramp || 0, gear = o.gear || 0;
+  // Landekufen
+  if (gear > 0) {
+    for (const sd of [-1, 1]) {
+      const y = sd * (8.5 + gear * 3);
+      ctx.strokeStyle = '#2a2e32'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(6, sd * 7); ctx.lineTo(6, y); ctx.moveTo(-12, sd * 7); ctx.lineTo(-12, y); ctx.stroke();
+      ctx.fillStyle = '#1c1f22'; rr(ctx, -17, y - 1.1, 28, 2.2, 1); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(-16, y - 1, 26, 0.6);
+    }
+  }
+  // Heckrampe
+  if (ramp > 0) {
+    const L = 10 * ramp;
+    const gl = ctx.createRadialGradient(-23, 0, 0, -23, 0, 10 + L); gl.addColorStop(0, `rgba(255,70,40,${0.35 * ramp})`); gl.addColorStop(1, 'rgba(255,70,40,0)');
+    ctx.fillStyle = gl; ell(ctx, -23 - L * 0.5, 0, 8 + L, 9); ctx.fill();
+    const rg = ctx.createLinearGradient(-23, 0, -23 - L, 0); rg.addColorStop(0, '#3a4046'); rg.addColorStop(1, '#22272b');
+    ctx.fillStyle = rg; ctx.beginPath(); ctx.moveTo(-22, -4.6); ctx.lineTo(-23 - L, -5.2); ctx.lineTo(-23 - L, 5.2); ctx.lineTo(-22, 4.6); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.5; for (let i = 1; i < 4; i++) { const x = -23 - L * i / 4; ctx.beginPath(); ctx.moveTo(x, -5); ctx.lineTo(x, 5); ctx.stroke(); }
+    ctx.strokeStyle = '#e1aa22'; ctx.lineWidth = 0.9; ctx.setLineDash([1.2, 1.2]); ctx.beginPath(); ctx.moveTo(-22, -4.6); ctx.lineTo(-23 - L, -5.2); ctx.moveTo(-22, 4.6); ctx.lineTo(-23 - L, 5.2); ctx.stroke(); ctx.setLineDash([]);
+  }
   // Ausleger zu den Triebwerken
   ctx.fillStyle = '#3a4248';
   for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(12, sd * 6); ctx.lineTo(16, sd * 10); ctx.lineTo(12, sd * 10); ctx.lineTo(8, sd * 6); ctx.fill(); ctx.beginPath(); ctx.moveTo(-10, sd * 6); ctx.lineTo(-12, sd * 10); ctx.lineTo(-16, sd * 10); ctx.lineTo(-14, sd * 6); ctx.fill(); }
   // Rumpf
-  const g = ctx.createLinearGradient(0, -9, 0, 9); g.addColorStop(0, '#6c7780'); g.addColorStop(0.5, '#4c565e'); g.addColorStop(1, '#2e353b');
+  const g = ctx.createLinearGradient(0, -9, 0, 9); g.addColorStop(0, '#666e66'); g.addColorStop(0.5, '#495048'); g.addColorStop(1, '#2a302b');
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(24, -3); ctx.lineTo(19, -8); ctx.lineTo(-20, -8); ctx.lineTo(-23, -5); ctx.lineTo(-23, 5); ctx.lineTo(-20, 8); ctx.lineTo(19, 8); ctx.lineTo(24, 3); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.7;
   ctx.beginPath(); for (const x of [-14, -6, 2, 10]) { ctx.moveTo(x, -8); ctx.lineTo(x, 8); } ctx.moveTo(-20, 0); ctx.lineTo(14, 0); ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(-20, -8, 39, 2.2);
+  shipWear(ctx, o.seed || 7);
   // Heckrampe
   ctx.fillStyle = '#2a3036'; rr(ctx, -23, -5, 4, 10, 1); ctx.fill();
   ctx.strokeStyle = 'rgba(232,179,32,0.6)'; ctx.setLineDash([1.5, 1.5]); ctx.beginPath(); ctx.moveTo(-21, -5); ctx.lineTo(-21, 5); ctx.stroke(); ctx.setLineDash([]);
@@ -195,6 +233,7 @@ export function drawSchiff(ctx, col, face, t, flying, alt = null) {
     ctx.fillStyle = h > 0.05 ? 'rgba(160,170,180,0.35)' : '#4a5258';
     for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.fillRect(-0.8, 0, 1.6, 5); }
     ctx.restore();
+    if (h > 0.02 && h < 0.6) { ctx.strokeStyle = `rgba(255,240,220,${0.07 * (1 - h)})`; ctx.lineWidth = 1.2; for (let k = 0; k < 3; k++) { const rr2 = 8 + k * 3 + Math.sin(t * 30 + k * 2 + x) * 1.2; ell(ctx, x + Math.sin(t * 23 + k) * 0.8, y, rr2, rr2 * 0.92); ctx.stroke(); } }
     if (h > 0.05) { const gl = ctx.createRadialGradient(x, y, 0, x, y, 9); gl.addColorStop(0, `rgba(140,200,255,${0.35 * h})`); gl.addColorStop(1, 'rgba(80,140,255,0)'); ctx.fillStyle = gl; ell(ctx, x, y, 9, 9); ctx.fill(); }
     ctx.fillStyle = 'rgba(0,0,0,0.5)'; ell(ctx, x, y, 1.4, 1.4); ctx.fill();
   }
@@ -632,6 +671,6 @@ export function drawThing(ctx, kind, type, col, face, t, extra = {}) {
   if (type === 'lademech') return drawLademech(ctx, col, face, t);
   if (type === 'schlepper') return drawSchlepper(ctx, col, face, t);
   if (type === 'panzerwagen') return drawPanzerwagen(ctx, col, face, t);
-  if (type === 'schiff') return drawSchiff(ctx, col, face, t, extra.flying);
+  if (type === 'schiff') return drawSchiff(ctx, col, face, t, extra.flying, null, { ramp: extra.ramp, gear: extra.gear, seed: extra.seed });
   return drawInfantry(ctx, type, col, ['schuetze', 'unteroff', 'smartgun', 'pionier', 'sani', 'flammer'].includes(type), face, t);
 }
