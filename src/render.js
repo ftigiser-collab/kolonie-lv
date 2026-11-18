@@ -208,6 +208,7 @@ export class Renderer {
     this.drawFog(ctx);
     this.drawLights(ctx, list);
     this.drawMist(ctx, view);
+    this.drawHighlights(ctx, 'dark');
     // Melder
     this.drawTrackerRing(ctx);
     this.drawBlips(ctx);
@@ -361,7 +362,7 @@ export class Renderer {
       if (g.isXeno(u) || UNITS[u.type].cls === 'air') continue;
       const p = this.posOf(u); if (!this.inView(p, 120)) continue;
       const a = u.face, len = HW * 2.2;
-      const gr = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, len); gr.addColorStop(0, 'rgba(255,245,215,0.13)'); gr.addColorStop(1, 'rgba(255,245,215,0)');
+      const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, len); gr.addColorStop(0, 'rgba(255,245,215,0)'); gr.addColorStop(0.22, 'rgba(255,245,215,0)'); gr.addColorStop(0.32, 'rgba(255,245,215,0.13)'); gr.addColorStop(1, 'rgba(255,245,215,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, len, a - 0.45, a + 0.45); ctx.closePath(); ctx.fill();
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, len * 0.9, a - 0.22, a + 0.22); ctx.closePath(); ctx.fill();
     }
@@ -402,6 +403,23 @@ export class Renderer {
   }
   drawHighlights(ctx, layer) {
     const h = this.hl, t = this.t;
+    if (layer === 'dark') {
+      // begehbare Felder und Ziele auch im Dunkeln zeigen
+      const v = this.g.vis[0];
+      if (h.move && this.moveEdges) {
+        ctx.fillStyle = 'rgba(90,175,255,0.16)';
+        for (const [, m] of h.move) { if (!m.end || m.cost === 0) continue; if (v && v.seen[this.g.idx(m.c, m.r)]) continue; const p = center(m.c, m.r); if (!this.inView(p)) continue; ctx.beginPath(); hexPath(ctx, p.x, p.y, R - 1); ctx.fill(); }
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = 'rgba(120,200,255,0.22)'; ctx.lineWidth = 6; ctx.beginPath(); for (const [ax, ay, bx, by] of this.moveEdges) { ctx.moveTo(ax, ay); ctx.lineTo(bx, by); } ctx.stroke();
+        ctx.strokeStyle = 'rgba(170,225,255,0.9)'; ctx.lineWidth = 1.6; ctx.stroke();
+      }
+      if (h.target.length) {
+        const a = 0.2 + 0.08 * Math.sin(t * 5);
+        ctx.fillStyle = `rgba(255,200,80,${a})`; ctx.strokeStyle = 'rgba(255,210,110,0.85)'; ctx.lineWidth = 1.5;
+        for (const [c, rr] of h.target) { if (v && v.seen[this.g.idx(c, rr)]) continue; const p = center(c, rr); ctx.beginPath(); hexPath(ctx, p.x, p.y, R - 2); ctx.fill(); ctx.stroke(); }
+      }
+      return;
+    }
     if (layer === 'under') {
       if (h.move) {
         if (this.moveKey !== h.move) {
