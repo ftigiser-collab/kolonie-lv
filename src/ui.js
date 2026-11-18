@@ -63,6 +63,7 @@ export class Controller {
           await this.tween(per, (k) => { u.vis = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }; u.face = ang; });
         }
         u.vis = null; u.animVisible = false; u.animHide = false;
+        if (UNITS[u.type].cls === 'veh') for (let i = 1; i < e.path.length; i++) { if (!this.seenHex(...e.path[i])) continue; const a = center(...e.path[i - 1]), b = center(...e.path[i]); r.tracks(a.x, a.y, b.x, b.y, u.type === 'lademech' ? 5 : 8); }
         if (e.stopped) await sleep(200);
         break;
       }
@@ -77,7 +78,10 @@ export class Controller {
         if (a.isBld) a.aim = Math.atan2(tp.y - ap.y, tp.x - ap.x);
         else a.face = Math.atan2(tp.y - ap.y, tp.x - ap.x);
         const xeno = !a.isBld && g.isXeno(a);
-        if (xeno) {
+        if (xeno && a.type === 'spucker') {
+          await this.tween(0.3 / sp, (k) => { const x = ap.x + (tp.x - ap.x) * k, y = ap.y + (tp.y - ap.y) * k - Math.sin(k * Math.PI) * 26; r.parts.push({ x, y, vx: 0, vy: 0, t: 0, life: 0.25, col: '#b6ff5a', size: 3, glow: true }); });
+          r.burst(tp.x, tp.y, '#b6ff5a', 18, 70, 0.6, 2, 40); r.flash(tp.x, tp.y, 60, '#9dff6a', 0.4, 0.35);
+        } else if (xeno) {
           // Hieb: kurzer Satz nach vorn
           const back = { ...ap };
           await this.tween(0.08 / sp, (k) => { a.vis = { x: back.x + (tp.x - back.x) * 0.35 * k, y: back.y + (tp.y - back.y) * 0.35 * k }; });
@@ -98,6 +102,7 @@ export class Controller {
               const col = type === 'werfer' ? '#ffd0a0' : FACTIONS[g.fac(a.owner)].color === '#72b6f0' ? '#cfe8ff' : '#ffe7a0';
               r.tracer(ap, { x: tp.x + jx, y: tp.y + jy }, col, type === 'werfer' ? 3 : 1.6);
               r.flash(ap.x, ap.y, 70, '#ffe2a8', 0.1, 0.4);
+              if (type !== 'werfer') { const fa = (a.face || a.aim || 0) + Math.PI / 2; r.parts.push({ x: ap.x, y: ap.y, vx: Math.cos(fa) * (30 + Math.random() * 20), vy: Math.sin(fa) * (30 + Math.random() * 20) - 10, t: 0, life: 0.5, col: '#d8b860', size: 1, grav: 120 }); }
               r.parts.push({ x: ap.x + Math.cos(a.face || a.aim || 0) * 14, y: ap.y + Math.sin(a.face || a.aim || 0) * 14, vx: 0, vy: 0, t: 0, life: 0.08, col: '#fff2b0', size: 5, glow: true });
             }
             await sleep(60 / sp);

@@ -108,6 +108,73 @@ export function bakeTerrain(m) {
     for (const [a, b] of segs) { const L2 = Math.hypot(b.x - a.x, b.y - a.y) || 1, px = -(b.y - a.y) / L2 * off, py = (b.x - a.x) / L2 * off; ctx.moveTo(a.x + px, a.y + py); ctx.lineTo(b.x + px, b.y + py); }
     ctx.stroke();
   }
+  // Rohrleitung und Laternen entlang der Wege
+  const lamps = [], beacons = [], steam = [];
+  const pipeSegs = [];
+  segs.forEach(([a, b], i) => {
+    const L2 = Math.hypot(b.x - a.x, b.y - a.y); if (L2 < 5) return;
+    const nx = -(b.y - a.y) / L2, ny = (b.x - a.x) / L2;
+    pipeSegs.push([a.x + nx * 17, a.y + ny * 17, b.x + nx * 17, b.y + ny * 17]);
+    if (i % 3 === 0) lamps.push({ x: a.x - nx * 17, y: a.y - ny * 17, broken: rnd() < 0.15, ph: rnd() * 10 });
+  });
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 6; ctx.beginPath(); for (const [x1, y1, x2, y2] of pipeSegs) { ctx.moveTo(x1 + 2, y1 + 3); ctx.lineTo(x2 + 2, y2 + 3); } ctx.stroke();
+  ctx.strokeStyle = '#4c5156'; ctx.lineWidth = 4.5; ctx.beginPath(); for (const [x1, y1, x2, y2] of pipeSegs) { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); } ctx.stroke();
+  ctx.strokeStyle = 'rgba(200,210,215,0.35)'; ctx.lineWidth = 1.2; ctx.beginPath(); for (const [x1, y1, x2, y2] of pipeSegs) { ctx.moveTo(x1 - 1, y1 - 1); ctx.lineTo(x2 - 1, y2 - 1); } ctx.stroke();
+  for (const [x1, y1, x2, y2] of pipeSegs) { const L3 = Math.hypot(x2 - x1, y2 - y1); for (let k = 8; k < L3; k += 22) { const f = k / L3; ctx.fillStyle = '#2c3034'; ctx.fillRect(x1 + (x2 - x1) * f - 2.5, y1 + (y2 - y1) * f - 2.5, 5, 5); } }
+  for (const l of lamps) {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(l.x + 5, l.y + 7, 6, 2, 0.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#2a2d30'; ctx.beginPath(); ctx.arc(l.x, l.y, 3, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#6a7076'; ctx.beginPath(); ctx.arc(l.x - 0.6, l.y - 0.6, 1.6, 0, TAU); ctx.fill();
+  }
+  // Container, Fässer und Kisten an Kolonie und Orten
+  const container = (x, y, a, c) => {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(-11 + 3, -5 + 4, 22, 10);
+    const g = ctx.createLinearGradient(0, -5, 0, 5); g.addColorStop(0, shade(c, 0.15)); g.addColorStop(1, shade(c, -0.35));
+    ctx.fillStyle = g; ctx.fillRect(-11, -5, 22, 10);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; for (let k = -9; k < 11; k += 3) { ctx.beginPath(); ctx.moveTo(k, -5); ctx.lineTo(k, 5); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(-11, -5, 22, 1.5);
+    ctx.restore();
+  };
+  const barrel = (x, y) => { ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(x + 1.5, y + 2, 3.2, 0, TAU); ctx.fill(); ctx.fillStyle = rnd() < 0.5 ? '#7a3a1e' : '#3e5a6a'; ctx.beginPath(); ctx.arc(x, y, 3, 0, TAU); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.arc(x, y, 2, 0, TAU); ctx.stroke(); };
+  const cols = ['#8a4a26', '#3e5a70', '#6a6a62', '#7a6a2a', '#4a5a3a'];
+  const anchors = [{ c: m.colony.c, r: m.colony.r, d0: 3, d1: 4, n: 7 }, ...m.sites.map((s) => ({ c: s.c, r: s.r, d0: 1, d1: 2, n: 2 }))];
+  for (const an of anchors) {
+    const ac = center(an.c, an.r);
+    for (let k = 0; k < an.n; k++) {
+      const a = rnd() * TAU, dist = (an.d0 + rnd() * (an.d1 - an.d0)) * HW;
+      const x = ac.x + Math.cos(a) * dist, y = ac.y + Math.sin(a) * dist;
+      const q = pixelToHex(x, y); if (q.col < 0 || q.row < 0 || q.col >= m.W || q.row >= m.H) continue;
+      const kk = T(q.col, q.row); if (kk === 'chasm' || kk === 'ridge' || kk === 'road') continue;
+      // an den Rand des Hexfelds schieben, damit die Mitte frei bleibt
+      const hc = center(q.col, q.row), ex = hc.x + (x - hc.x) * 0.3 + Math.cos(a) * R * 0.55, ey = hc.y + (y - hc.y) * 0.3 + Math.sin(a) * R * 0.45;
+      if (rnd() < 0.6) { container(ex, ey, a + Math.PI / 2 + (rnd() - 0.5) * 0.5, cols[Math.floor(rnd() * cols.length)]); if (rnd() < 0.4) container(ex + 3, ey - 7, a + Math.PI / 2 + (rnd() - 0.5) * 0.3, cols[Math.floor(rnd() * cols.length)]); }
+      else for (let b = 0; b < 4; b++) barrel(ex + (rnd() - 0.5) * 12, ey + (rnd() - 0.5) * 10);
+    }
+  }
+  // Verlassene Bergbaumaschinen
+  for (let k = 0, tries = 0; k < 4 && tries < 80; tries++) {
+    const c = Math.floor(rnd() * m.W), r = Math.floor(rnd() * m.H);
+    if (T(c, r) !== 'dust' || Math.abs(c - m.colony.c) + Math.abs(r - m.colony.r) < 6) continue;
+    const p = center(c, r); ctx.save(); ctx.translate(p.x + (rnd() - 0.5) * 16, p.y + (rnd() - 0.5) * 12); ctx.rotate(rnd() * TAU);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(-14 + 3, -9 + 4, 28, 18);
+    ctx.fillStyle = '#2a2420'; ctx.fillRect(-14, -9, 28, 4); ctx.fillRect(-14, 5, 28, 4);
+    const g = ctx.createLinearGradient(-10, -6, 10, 6); g.addColorStop(0, '#7a5a34'); g.addColorStop(1, '#3a2a1a');
+    ctx.fillStyle = g; ctx.fillRect(-11, -6, 20, 12);
+    ctx.fillStyle = 'rgba(120,60,30,0.5)'; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.arc((rnd() - 0.5) * 18, (rnd() - 0.5) * 10, 1 + rnd() * 2, 0, TAU); ctx.fill(); }
+    ctx.strokeStyle = '#4a3a2a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(20, -3); ctx.stroke();
+    ctx.fillStyle = '#3a3430'; ctx.beginPath(); ctx.arc(21, -3, 4, 0, TAU); ctx.fill();
+    ctx.restore(); k++;
+  }
+  // Leuchtfeuer am Landefeld, Dampfquellen
+  for (let r = 0; r < m.H; r++) for (let c = 0; c < m.W; c++) {
+    if (T(c, r) !== 'pad') continue;
+    const p = center(c, r);
+    for (let i = 0; i < 6; i += 2) { const a = Math.PI / 180 * (60 * i - 30); beacons.push({ x: p.x + Math.cos(a) * (R - 5), y: p.y + Math.sin(a) * (R - 5), col: (c + r + i) % 2 ? '#ff4a3a' : '#5aff7a', ph: (c * 3 + r + i) * 0.7 }); }
+  }
+  for (const v of m.vents) if (v.kind === 'cave' || v.kind === 'nest' || rnd() < 0.3) { const p = center(v.c, v.r); steam.push({ x: p.x + 14, y: p.y + 12, c: v.c, r: v.r, rate: v.kind === 'nest' ? 1.4 : 0.6 + rnd() * 0.6 }); }
+  cv.props = { lamps, beacons, steam };
   // Felsbrocken mit Licht und Schatten
   const rock = (x, y, s) => {
     const pts = []; const k = 6 + Math.floor(rnd() * 3);
@@ -222,9 +289,14 @@ export function paintDecal(cv, kind, x, y, s = 1) {
     ctx.strokeStyle = 'rgba(140,120,100,0.18)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(-2, -2, 26 * s, 0, TAU); ctx.stroke();
     ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.5;
     for (let i = 0; i < 18; i++) { const a = rnd() * TAU, l = (30 + rnd() * 40) * s; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 20 * s, Math.sin(a) * 20 * s); ctx.lineTo(Math.cos(a) * l, Math.sin(a) * l); ctx.stroke(); }
-  } else if (kind === 'tracks') {
-    ctx.strokeStyle = 'rgba(30,26,22,0.18)'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(-6, -s); ctx.lineTo(-6, s); ctx.moveTo(6, -s); ctx.lineTo(6, s); ctx.stroke();
   }
+  ctx.restore();
+}
+
+// Fahrspur zwischen zwei Punkten
+export function paintTracks(cv, ax, ay, bx, by, wide = 7, col = 'rgba(28,24,20,0.22)') {
+  const ctx = cv.getContext('2d'), L = Math.hypot(bx - ax, by - ay) || 1, nx = -(by - ay) / L * wide, ny = (bx - ax) / L * wide;
+  ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(ax + nx, ay + ny); ctx.lineTo(bx + nx, by + ny); ctx.moveTo(ax - nx, ay - ny); ctx.lineTo(bx - nx, by - ny); ctx.stroke();
   ctx.restore();
 }

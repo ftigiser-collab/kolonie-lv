@@ -31,10 +31,10 @@ Spin-off von [Sandthron](https://github.com/ftigiser-collab/sandthron) im Alien-
 | Kennen alle Schächte | Jeder Trupp mit Kurzstrecken-Melder, Unteroffizier mit großem Melder |
 | Werfer holen Landungsschiffe vom Himmel | Smartgunner mit Reaktionsfeuer, Landungsschiffe fliegen über alles |
 
-**Siedler:** Miliz, Späher (Melder, Leuchtpistole), Techniker, Brenner, Werfer, Lademech, Raupenschlepper.
-**Marines:** Schütze, Unteroffizier (Melder, Leuchtfackeln), Smartgunner, Pionier, Sanitäter, Panzerwagen, Landungsschiff.
-**Brut:** Ei, Klammerer, Brutling, Läufer, Jäger, Brecher, Mutter.
-**Bauten:** Wohnmodul, Werkstatt, Krankenstation, Wachgeschütz, Flutlicht, Sensormast, Barrikade, FOB, Sanitätszelt.
+**Siedler:** Miliz, Späher (Melder, Leuchtpistole), Techniker, Brenner, Werfer, Lademech, Raupenschlepper, Synthetiker.
+**Marines:** Schütze, Unteroffizier (Melder, Leuchtfackeln, Orbitalschlag), Smartgunner, Flammentrupp, Pionier, Sanitäter, Panzerwagen, Landungsschiff, Synthetiker.
+**Brut:** Ei, Nestknoten, Klammerer, Brutling, Läufer, Spucker, Jäger, Brecher, Mutter.
+**Bauten:** Wohnmodul, Werkstatt, Krankenstation, Wachturm, Wachgeschütz, Flutlicht, Sensormast, Barrikade, FOB, Sanitätszelt, Munitionsdepot.
 
 ## Sieg
 - Fünf Schlüsselorte: Atmosphäreprozessor (2 Punkte), Funkmast (Melder 9), Labor, zwei Erzminen. Punkte je Runde nur für **besetzte** Orte (eigene Einheit daneben oder eigenes Geschütz/FOB in 2 Feldern).
@@ -61,6 +61,8 @@ Spin-off von [Sandthron](https://github.com/ftigiser-collab/sandthron) im Alien-
 - Ziehender Dunst, Staubpartikel, Blitze im Staubsturm
 - Einheiten drehen sich weich, atmen leicht, Trupps mit Rucksack und Fraktionsfarbe am Helm; Bewegungsbereich als Umriss
 - Aufgeräumte Oberfläche, kompakte Kopfzeile auf dem Handy
+- Mehr Details: Rohrleitungen und Laternen entlang der Fahrwege (teils flackernd), Container und Fässer an Kolonie und Orten, verlassene Bergbaumaschinen, Leuchtfeuer am Landefeld, Dampf aus Spalten und Schächten, glänzendes Harz, Fahrspuren von Fahrzeugen, Patronenhülsen, Scheinwerferkegel der Wachtürme
+- Neu: Spucker, Nestknoten, Flammentrupp, Munitionsdepot, Wachturm
 
 ## Geplant
 - Mehr Kartentypen (Kolonie im Eis, Raffinerie, Raumstation)

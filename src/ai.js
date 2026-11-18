@@ -47,6 +47,7 @@ function buyPhase(g, pid) {
       type = pick(bag);
     } else {
       const bag = ['schuetze', 'schuetze', 'schuetze', 'smartgun', 'smartgun'];
+      if (count('flammer') < 2 && g.stage >= 2) bag.push('flammer');
       if (count('unteroff') < 2) bag.push('unteroff');
       if (count('sani') < 2) bag.push('sani');
       if (count('pionier') < 2) bag.push('pionier', 'pionier');
@@ -143,7 +144,7 @@ function targetValue(g, u, t, from) {
   const max = g.maxHp(t);
   let v = f.dmg / max * 10 + (f.kill ? 8 : 0) - f.ctr * 0.6;
   if (t.isBld) v += t.type === 'zentrale' ? 3 : t.type === 'fob' ? 3 : BUILDINGS[t.type].sentry ? 2 : 0;
-  if (!t.isBld && g.isXeno(t)) v += t.type === 'mutter' ? 6 : t.type === 'ei' ? 3 : 1.5;
+  if (!t.isBld && g.isXeno(t)) v += t.type === 'mutter' ? 6 : t.type === 'knoten' ? 5 : t.type === 'ei' ? 3 : 1.5;
   if (!t.isBld && t.type === 'schiff') v += 2 + (g.players[u.owner].obj?.key === 'abschuss' ? 4 : 0);
   if (!t.isBld && t.owner === 2 && t.type === 'synth') v += 2;
   if (!t.isBld && t.host) v -= 1;
@@ -273,6 +274,8 @@ function postActions(g, u) {
     if (cnt('flutlicht') < 2 + g.round / 6) bag.push('flutlicht');
     if (f === 'siedler' && cnt('wohnmodul') < 4 && p.credits > 450) bag.push('wohnmodul');
     if (f === 'marines' && cnt('sanizelt') < cnt('fob')) bag.push('sanizelt', 'sanizelt');
+    if (f === 'marines' && cnt('depot') < 2 && !g.buildings.some((b) => b.owner === pid && (b.type === 'fob' || b.type === 'depot') && distance(b.c, b.r, u.c, u.r) <= 3)) bag.push('depot', 'depot');
+    if (f === 'siedler' && cnt('wachturm') < 2 && g.round > 3) bag.push('wachturm');
     if (cnt('sensor') < 1 && g.round > 5) bag.push('sensor');
     if (bag.length && Math.random() < 0.7) {
       const t = pick(bag);
@@ -340,7 +343,7 @@ function shipPoint(g, pid, s) {
 function* brutTurn(g, pid) {
   broodSpawn(g, pid);
   yield 'spawn';
-  const xs = g.units.filter((u) => u.owner === pid && u.type !== 'ei').sort((a, b) => (a.type === 'klammerer' ? 0 : 1) - (b.type === 'klammerer' ? 0 : 1));
+  const xs = g.units.filter((u) => u.owner === pid && u.type !== 'ei' && u.type !== 'knoten').sort((a, b) => (a.type === 'klammerer' ? 0 : 1) - (b.type === 'klammerer' ? 0 : 1));
   for (const u of xs) {
     if (g.state || !g.units.includes(u)) continue;
     const did = u.type === 'synth' ? actRogue(g, u) : actXeno(g, u);
@@ -354,7 +357,8 @@ function prey(g, x) {
 
 function broodSpawn(g, pid) {
   const st = g.stage, brood = g.diff.brood || 1;
-  const mobile = g.units.filter((u) => u.owner === pid && u.type !== 'ei').length;
+  const mobile = g.units.filter((u) => u.owner === pid && u.type !== 'ei' && u.type !== 'knoten').length;
+  const knots = g.units.filter((u) => u.type === 'knoten');
   const eggs = g.units.filter((u) => u.owner === pid && u.type === 'ei').length;
   const cap = Math.round((5 + st * 3) * brood);
   const eggCap = (st + 1) * 2;
@@ -375,12 +379,26 @@ function broodSpawn(g, pid) {
       if (st >= 3) opts.push('brecher');
     }
     if (eggs + guard - 1 < eggCap) opts.push('ei');
+    if (st >= 2) opts.push('spucker');
+    if (st >= 2 && knots.length < 1 + st && guard === 1) opts.push('knoten', 'knoten');
     if (!opts.length) break;
     type = pick(opts);
     const cost = BROOD[type].b;
     if (g.biomass < cost) break;
     // Spawnort: Nest oder Schachtknoten auf Harz (im Schacht)
-    if (type === 'ei') {
+    if (type === 'knoten') {
+      const spots = [];
+      for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++) {
+        if (!g.resin[g.idx(c, r)] || g.unitAt(c, r) || g.bAt(c, r) || g.ventAt(c, r) || g.siteAt(c, r) || g.terr(c, r) === 'chasm') continue;
+        if (g.units.some((u) => !g.isXeno(u) && g.onMap(u) && distance(u.c, u.r, c, r) <= 4)) continue;
+        if (knots.some((k) => distance(k.c, k.r, c, r) < 4) || distance(c, r, nest.c, nest.r) < 3) continue;
+        spots.push([c, r]);
+      }
+      if (!spots.length) { guard++; continue; }
+      const [c, r] = pick(spots);
+      knots.push(g.addUnit(pid, 'knoten', c, r));
+      for (const [x, y] of ring(c, r, 1, g.W, g.H)) if (g.terr(x, y) !== 'chasm') g.resin[g.idx(x, y)] = 1;
+    } else if (type === 'ei') {
       const spots = [];
       for (let r = 0; r < g.H; r++) for (let c = 0; c < g.W; c++) if (g.resin[g.idx(c, r)] && !g.unitAt(c, r) && !g.bAt(c, r) && !g.ventAt(c, r) && !g.siteAt(c, r) && g.terr(c, r) !== 'chasm') spots.push([c, r]);
       // nicht direkt vor die Läufe der Menschen
@@ -394,7 +412,8 @@ function broodSpawn(g, pid) {
         const v = pick(vents);
         const u = g.addUnit(pid, type, v.c, v.r); u.inVent = true; u.ventId = v.id; u.lastMove = g.tick; u.ventTick = g.tick;
       } else {
-        const h = g.freeHexNear(nest.c, nest.r, type, 3);
+        const src = knots.length && Math.random() < 0.6 ? pick(knots) : nest;
+        const h = g.freeHexNear(src.c, src.r, type, 3);
         if (!h) break;
         const u = g.addUnit(pid, type, h[0], h[1]); u.lastMove = g.tick;
       }
@@ -511,6 +530,25 @@ function actXeno(g, x) {
     return false;
   }
 
+  // Spucker: aus Distanz
+  if (d.rng[1] >= 2) {
+    const reach = g.reachable(x);
+    let best = null;
+    for (const [, h] of reach) {
+      if (!h.end) continue;
+      for (const t of g.targetsFrom(x, h.c, h.r, false)) {
+        if (t.isBld || g.isXeno(t)) continue;
+        const dd = distance(h.c, h.r, t.c, t.r);
+        const v = preyValue(g, x, t) + (dd === 2 ? 2 : 0) - hexRisk(g, x, h.c, h.r);
+        if (!best || v > best.v) best = { v, h, t };
+      }
+    }
+    if (best && best.v > 3) {
+      if (best.h.c !== x.c || best.h.r !== x.r) g.moveUnit(x, best.h.c, best.h.r, reach);
+      if (g.units.includes(x) && g.alive(best.t) && g.targetsFrom(x, x.c, x.r, false).includes(best.t)) g.attack(x, best.t);
+      return true;
+    }
+  }
   // Zuschlagen?
   const s = strike(g, x);
   if (s) {

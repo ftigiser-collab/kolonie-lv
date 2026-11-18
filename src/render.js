@@ -3,7 +3,7 @@ import { center, hexPath, R, HW, VS, distance, corners, pixelToHex } from './hex
 import { clamp, rgba, shade, Noise, mulberry32 } from './util.js';
 import { TERRAIN, FACTIONS, UNITS, BUILDINGS, SITES } from './data.js';
 import { drawThing, drawVent, drawScaffold, drawSite } from './sprites.js';
-import { bakeTerrain, paintDecal } from './terrain.js';
+import { bakeTerrain, paintDecal, paintTracks } from './terrain.js';
 
 const TAU = Math.PI * 2;
 const TRK = '#5dff9a';
@@ -45,6 +45,7 @@ export class Renderer {
   }
   onScreen(x, y, m = 40) { const s = { x: (x - this.cam.x) * this.cam.z, y: (y - this.cam.y) * this.cam.z }; return s.x > m && s.y > m + 50 && s.x < this.vw - m && s.y < this.vh - m; }
   posOf(e) { return e.vis || center(e.c, e.r); }
+  hexOf(p) { const h = pixelToHex(p.x, p.y); return [clamp(h.col, 0, this.g.W - 1), clamp(h.row, 0, this.g.H - 1)]; }
 
   // ---------- Gelände vorberechnen ----------
   bake() {
@@ -67,6 +68,7 @@ export class Renderer {
     this.mist = mc;
     this.motes = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), z: 0.4 + Math.random() * 0.8, p: Math.random() * 6 }));
   }
+  tracks(ax, ay, bx, by, w) { try { paintTracks(this.base, ax, ay, bx, by, w); } catch (e) { /* egal */ } }
   decal(kind, x, y, s = 1) { try { paintDecal(this.base, kind, x, y, s); } catch (e) { console.warn(e); } }
   flash(x, y, rad, col = '#ffd8a0', life = 0.18, a = 0.5) { this.flashes.push({ x, y, rad, col, life, t: 0, a }); }
   blob(ctx, x, y, s, rnd) {
@@ -128,9 +130,14 @@ export class Renderer {
     for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
       const i = r * W + c; if (!explored[i]) continue;
       const p = center(c, r); if (!inView(p)) continue;
-      if (g.resin[i]) { const tl = this.resinTiles[(c * 7 + r * 3) % 3]; ctx.drawImage(tl, p.x - tl.width / 2, p.y - tl.height / 2); }
+      if (g.resin[i]) { const tl = this.resinTiles[(c * 7 + r * 3) % 3]; ctx.drawImage(tl, p.x - tl.width / 2, p.y - tl.height / 2); const gl = Math.sin(t * 1.3 + i * 0.7); if (gl > 0.6) { ctx.fillStyle = `rgba(170,180,230,${(gl - 0.6) * 0.5})`; ctx.beginPath(); ctx.ellipse(p.x + ((i * 13) % 30) - 15, p.y + ((i * 7) % 24) - 12, 3, 1.4, 0.5, 0, TAU); ctx.fill(); } }
       if (g.acid[i] >= g.round) { for (let k = 0; k < 4; k++) { const a = (t * 0.7 + k * 1.7 + i) % TAU, d = 6 + (k * 5) % 14; ctx.fillStyle = `rgba(140,255,90,${0.18 + 0.1 * Math.sin(t * 5 + k)})`; ctx.beginPath(); ctx.ellipse(p.x + Math.cos(a) * d, p.y + Math.sin(a) * d * 0.7, 5, 3.5, 0, 0, TAU); ctx.fill(); } }
       if (g.fire[i] >= g.round && Math.random() < dt * 30) this.parts.push({ x: p.x + (Math.random() - 0.5) * 40, y: p.y + (Math.random() - 0.5) * 30, vx: (Math.random() - 0.5) * 10, vy: -20 - Math.random() * 30, t: 0, life: 0.7, col: Math.random() < 0.5 ? '#ff8a2a' : '#ffd25a', size: 3 + Math.random() * 3, glow: true });
+    }
+    // Dampf aus Spalten und Schächten
+    for (const s of (this.base.props || {}).steam || []) {
+      if (!explored[s.r * W + s.c] || !inView(s, 60)) continue;
+      if (Math.random() < dt * s.rate * 6) this.parts.push({ x: s.x + (Math.random() - 0.5) * 6, y: s.y, vx: (Math.random() - 0.2) * 10, vy: -8 - Math.random() * 10, t: 0, life: 2.6, col: '#c0c4cc', size: 5 + Math.random() * 4, grow: 9, fade: 0.16, soft: true });
     }
     // Schachtnetz
     const vk = (v) => g.knowsVent(0, v);
@@ -327,6 +334,24 @@ export class Renderer {
       if (b.type === 'flutlicht') glow(p.x, p.y - 6, 16, '#ffffff', 0.5 * fl);
     }
     for (const f of g.flares) { const p = center(f.c, f.r); const fl = 0.85 + 0.15 * Math.sin(t * 23 + f.c); glow(p.x, p.y, f.rad * HW * 1.25, '#ff8a6a', 0.2 * fl); glow(p.x, p.y, 12, '#fff0e0', 0.8 * fl); }
+    const pr = this.base.props || { lamps: [], beacons: [] };
+    for (const l of pr.lamps) {
+      if (!this.inView(l, 80) || !g.explored[g.idx(...this.hexOf(l))]) continue;
+      let a = 0.16;
+      if (l.broken) { const k = Math.sin(t * 13 + l.ph) * Math.sin(t * 3.1 + l.ph * 2); a = k > 0.3 ? 0.18 : 0.02; }
+      glow(l.x, l.y, 58, '#ffc880', a); glow(l.x, l.y, 6, '#fff0d0', a * 3);
+    }
+    for (const b of pr.beacons) {
+      if (!this.inView(b, 30) || !g.explored[g.idx(...this.hexOf(b))]) continue;
+      const on = Math.sin(t * 3 + b.ph) > 0.55;
+      if (on) { glow(b.x, b.y, 16, b.col, 0.6); glow(b.x, b.y, 3, '#ffffff', 0.9); }
+    }
+    for (const b of g.buildings) {
+      if (b.type !== 'wachturm' || b.progress || !g.bVisibleTo(0, b)) continue;
+      const p = center(b.c, b.r), ang = Math.sin(t * 0.7) * 0.8 - Math.PI / 2 + b.id, len = HW * 4.5;
+      const gr = ctx.createRadialGradient(p.x, p.y - 12, 4, p.x, p.y - 12, len); gr.addColorStop(0, 'rgba(255,248,220,0.22)'); gr.addColorStop(1, 'rgba(255,248,220,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(p.x, p.y - 12); ctx.arc(p.x, p.y - 12, len, ang - 0.18, ang + 0.18); ctx.closePath(); ctx.fill();
+    }
     for (const f of this.flashes) { f.t += 1 / 60; const k = 1 - f.t / f.life; if (k > 0) glow(f.x, f.y, f.rad, f.col, f.a * k); }
     this.flashes = this.flashes.filter((f) => f.t < f.life);
     // Feuerschein
@@ -429,7 +454,11 @@ export class Renderer {
       p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.grav || 0) * dt; p.vx *= 0.96; p.vy *= 0.96;
       const k = 1 - p.t / p.life; if (k <= 0) continue;
       if (p.glow) ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = rgba(p.col, k); ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.glow ? k + 0.3 : 1), 0, TAU); ctx.fill();
+      const sz = p.grow ? p.size + p.grow * (1 - k) * 2 : p.size * (p.glow ? k + 0.3 : 1);
+      const al = p.fade ? p.fade * Math.sin(k * Math.PI) : k;
+      if (p.soft) { const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, sz); gr.addColorStop(0, rgba(p.col, al)); gr.addColorStop(1, rgba(p.col, 0)); ctx.fillStyle = gr; }
+      else ctx.fillStyle = rgba(p.col, al);
+      ctx.beginPath(); ctx.arc(p.x, p.y, sz, 0, TAU); ctx.fill();
       ctx.globalCompositeOperation = 'source-over';
     }
     ctx.restore();

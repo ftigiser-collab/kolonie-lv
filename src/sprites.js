@@ -14,7 +14,7 @@ function stripes(ctx, x, y, w, h, n = 5) {
 }
 
 // ---------- Infanterie ----------
-const KIT = { miliz: 'rifle', spaeher: 'tracker', techniker: 'torch', brenner: 'flamer', werfer: 'tube', schuetze: 'pulse', unteroff: 'tracker', smartgun: 'smart', pionier: 'torch', sani: 'med' };
+const KIT = { flammer: 'flamer', miliz: 'rifle', spaeher: 'tracker', techniker: 'torch', brenner: 'flamer', werfer: 'tube', schuetze: 'pulse', unteroff: 'tracker', smartgun: 'smart', pionier: 'torch', sani: 'med' };
 function trooper(ctx, col, kit, marine, t, lead) {
   const armor = marine ? '#3b4a3a' : '#5a4a3a', skin = marine ? '#2d3a2c' : '#6a5440';
   // Waffe
@@ -67,7 +67,7 @@ function synthFigure(ctx, col, t) {
 export function drawInfantry(ctx, type, col, marine, face, t) {
   if (type === 'synth') { ctx.save(); ctx.rotate(face); ctx.scale(1.1, 1.1); synthFigure(ctx, col, t); ctx.restore(); return; }
   const kit = KIT[type] || 'rifle';
-  const n = type === 'smartgun' || type === 'werfer' || type === 'brenner' ? 2 : 3;
+  const n = type === 'smartgun' || type === 'werfer' || type === 'brenner' || type === 'flammer' ? 2 : 3;
   const spots = n === 3 ? [[5, 0], [-5, -7], [-5, 7]] : [[4, -3], [-5, 5]];
   ctx.save(); ctx.rotate(face);
   for (const [x, y] of spots) { ctx.save(); ctx.translate(x, y); shadow(ctx, 6, 5, 0.35, 1.5, 2); ctx.restore(); }
@@ -189,6 +189,26 @@ export function drawXeno(ctx, type, face, t, s = 1) {
     ctx.fillStyle = 'rgba(170,190,120,0.25)'; ell(ctx, -2.5, -3.5, 2.5, 1.6, -0.5); ctx.fill();
     ctx.restore(); return;
   }
+  if (type === 'knoten') {
+    ctx.rotate(-face);
+    const pulse = 1 + Math.sin(t * 1.6) * 0.04;
+    const ao = ctx.createRadialGradient(2, 4, 4, 2, 4, 26); ao.addColorStop(0, 'rgba(0,0,0,0.6)'); ao.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ao; ell(ctx, 2, 4, 26, 20); ctx.fill();
+    ctx.scale(pulse, pulse);
+    // Wurzeln
+    ctx.strokeStyle = XB; ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) { const a = i / 9 * TAU + 0.3; ctx.lineWidth = 3.5 - (i % 3); ctx.beginPath(); ctx.moveTo(Math.cos(a) * 8, Math.sin(a) * 7); ctx.quadraticCurveTo(Math.cos(a + 0.4) * 16, Math.sin(a + 0.4) * 13, Math.cos(a) * 22, Math.sin(a) * 18); ctx.stroke(); }
+    const g = ctx.createRadialGradient(-4, -5, 1, 0, 0, 15); g.addColorStop(0, '#3a3450'); g.addColorStop(0.6, '#1a1626'); g.addColorStop(1, '#0a0810');
+    ctx.fillStyle = g; ctx.beginPath();
+    for (let i = 0; i <= 10; i++) { const a = i / 10 * TAU, rr = 13 + Math.sin(a * 3 + 1) * 2.5; i ? ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr * 0.85) : ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr * 0.85); }
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(123,134,176,0.35)'; ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; ctx.beginPath(); ctx.moveTo(Math.cos(a) * 4, Math.sin(a) * 3); ctx.quadraticCurveTo(Math.cos(a + 0.5) * 9, Math.sin(a + 0.5) * 8, Math.cos(a) * 12, Math.sin(a) * 10); ctx.stroke(); }
+    const core = 0.5 + 0.5 * Math.sin(t * 2.4);
+    const cg = ctx.createRadialGradient(0, 0, 0, 0, 0, 7); cg.addColorStop(0, `rgba(200,160,255,${0.55 + 0.35 * core})`); cg.addColorStop(1, 'rgba(120,80,200,0)');
+    ctx.fillStyle = cg; ell(ctx, 0, 0, 7, 6); ctx.fill();
+    ctx.restore(); return;
+  }
   if (type === 'klammerer') {
     shadow(ctx, 9, 7, 0.45, 2, 3);
     tail(ctx, 14, 2.2, t, 1.5);
@@ -212,7 +232,17 @@ export function drawXeno(ctx, type, face, t, s = 1) {
   ctx.scale(big, big);
   shadow(ctx, 13, 8, 0.5, 2, 3);
   rim(ctx, type === 'mutter' ? 0.8 : 0.55);
-  if (type === 'laeufer') {
+  if (type === 'spucker') {
+    tail(ctx, 16, 2.4, t);
+    for (const sd of [-1, 1]) { limb(ctx, 4, sd * 2, 7 + step * sd, sd * 7, 11, sd * 6, 1.7); limb(ctx, -5, sd * 2, -7 - step * sd, sd * 8, -11, sd * 7, 1.7); }
+    ctx.fillStyle = XB; ell(ctx, -2, 0, 7, 4); ctx.fill();
+    ctx.shadowBlur = 0;
+    const sac = 0.5 + 0.5 * Math.sin(t * 3);
+    for (const sd of [-1, 1]) { const g = ctx.createRadialGradient(-3, sd * 3.5, 0, -3, sd * 3.5, 4); g.addColorStop(0, `rgba(190,255,90,${0.7 + 0.3 * sac})`); g.addColorStop(1, 'rgba(60,120,20,0.2)'); ctx.fillStyle = g; ell(ctx, -3, sd * 3.5, 3.6, 2.6); ctx.fill(); }
+    rim(ctx, 0.5);
+    ctx.fillStyle = XB; ctx.beginPath(); ctx.moveTo(3, -2.6); ctx.quadraticCurveTo(13, -3.5, 14, 0); ctx.quadraticCurveTo(13, 3.5, 3, 2.6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = `rgba(190,255,90,${0.5 + 0.5 * sac})`; ell(ctx, 14.5, 0, 1.4, 1); ctx.fill();
+  } else if (type === 'laeufer') {
     tail(ctx, 20, 2.6, t);
     for (const sd of [-1, 1]) { limb(ctx, 4, sd * 2, 7 + step * sd, sd * 7, 11, sd * 6, 1.8); limb(ctx, -5, sd * 2, -7 - step * sd, sd * 8, -11, sd * 7, 1.8); }
     ctx.fillStyle = XB; ell(ctx, -1, 0, 8, 3.6); ctx.fill();
@@ -329,6 +359,28 @@ export function drawBuilding(ctx, type, col, t, b = {}) {
       ctx.fillStyle = col; ctx.fillRect(-16, 4, 32, 2);
       break;
     }
+    case 'depot': {
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ell(ctx, 3, 4, 16, 12); ctx.fill();
+      const box = (x, y, w, h, c) => { const g = ctx.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, shade(c, 0.2)); g.addColorStop(1, shade(c, -0.3)); ctx.fillStyle = g; rr(ctx, x, y, w, h, 1.5); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w / 2, y + h); ctx.stroke(); ctx.fillStyle = '#e8c860'; ctx.fillRect(x + 1.5, y + 1.5, 3, 1.5); };
+      box(-12, -8, 11, 8, '#5a6a44'); box(0, -9, 11, 8, '#56643f'); box(-7, 1, 13, 9, '#4e5c3a');
+      ctx.fillStyle = col; ctx.fillRect(-7, 8, 13, 2);
+      break;
+    }
+    case 'wachturm': {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ell(ctx, 10, 12, 14, 9); ctx.fill();
+      ctx.strokeStyle = '#4a4e52'; ctx.lineWidth = 2;
+      for (const [x, y] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x * 0.5 + 6, y * 0.5 + 8); ctx.stroke(); }
+      ctx.strokeStyle = '#33373a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-8, -8); ctx.lineTo(8, 8); ctx.moveTo(8, -8); ctx.lineTo(-8, 8); ctx.stroke();
+      const g = ctx.createLinearGradient(-10, -10, 10, 10); g.addColorStop(0, '#7a8288'); g.addColorStop(1, '#3e4448');
+      ctx.fillStyle = g; rr(ctx, -10, -12, 20, 18, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,210,140,0.75)'; ctx.fillRect(-7, -9, 14, 3);
+      ctx.fillStyle = col; ctx.fillRect(-10, 4, 20, 2);
+      ctx.save(); ctx.translate(0, -12); ctx.rotate(Math.sin(t * 0.7) * 0.8);
+      ctx.fillStyle = '#2a2e32'; rr(ctx, -3, -4, 6, 6, 1); ctx.fill();
+      ctx.fillStyle = '#fff6d8'; ctx.fillRect(-2.5, -5, 5, 1.6);
+      ctx.restore();
+      break;
+    }
     case 'fob': {
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ell(ctx, 3, 4, 26, 20); ctx.fill();
       ctx.strokeStyle = '#6b6248'; ctx.lineWidth = 5; ell(ctx, 0, 0, 22, 17); ctx.stroke();
@@ -424,10 +476,10 @@ export function iconCanvas(kind, type, col, w = 60, h = 45) {
 export function drawThing(ctx, kind, type, col, face, t, extra = {}) {
   if (kind === 'bld') return drawBuilding(ctx, type, col, t, extra);
   if (kind === 'site') return drawSite(ctx, type, t);
-  if (['ei', 'klammerer', 'brutling', 'laeufer', 'jaeger', 'brecher', 'mutter'].includes(type)) return drawXeno(ctx, type, face, t);
+  if (['ei', 'klammerer', 'brutling', 'laeufer', 'jaeger', 'brecher', 'mutter', 'spucker', 'knoten'].includes(type)) return drawXeno(ctx, type, face, t);
   if (type === 'lademech') return drawLademech(ctx, col, face, t);
   if (type === 'schlepper') return drawSchlepper(ctx, col, face, t);
   if (type === 'panzerwagen') return drawPanzerwagen(ctx, col, face, t);
   if (type === 'schiff') return drawSchiff(ctx, col, face, t, extra.flying);
-  return drawInfantry(ctx, type, col, ['schuetze', 'unteroff', 'smartgun', 'pionier', 'sani'].includes(type), face, t);
+  return drawInfantry(ctx, type, col, ['schuetze', 'unteroff', 'smartgun', 'pionier', 'sani', 'flammer'].includes(type), face, t);
 }

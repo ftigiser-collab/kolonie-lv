@@ -90,7 +90,8 @@ export class Game {
     for (const [c, r] of ring(m.nest.c, m.nest.r, 2, this.W, this.H)) if (this.terr(c, r) !== 'chasm') this.resin[this.idx(c, r)] = 1;
     for (const v of this.vents.filter((v) => v.kind === 'nest')) for (const [c, r] of ring(v.c, v.r, 1, this.W, this.H)) if (this.terr(c, r) !== 'chasm') this.resin[this.idx(c, r)] = 1;
     const eggSpots = ring(m.nest.c, m.nest.r, 2, this.W, this.H).filter(([c, r]) => distance(c, r, m.nest.c, m.nest.r) >= 1 && !this.ventAt(c, r) && this.terr(c, r) !== 'chasm').sort(() => Math.random() - 0.5);
-    for (const [c, r] of eggSpots.slice(0, 5)) this.addUnit(2, 'ei', c, r);
+    { const h = this.freeHexNear(m.nest.c, m.nest.r, 'knoten', 2); if (h) this.addUnit(2, 'knoten', h[0], h[1]); }
+    for (const [c, r] of eggSpots.slice(0, 5)) if (!this.unitAt(c, r)) this.addUnit(2, 'ei', c, r);
     const nv = this.vents.filter((v) => v.kind === 'nest'), cv = this.vents.filter((v) => v.kind === 'cave').sort((a, b) => distance(a.c, a.r, this.W / 2, this.H / 2) - distance(b.c, b.r, this.W / 2, this.H / 2));
     for (const v of [nv[0], cv[0] || nv[1], cv[1]]) if (v) { const u = this.addUnit(2, 'laeufer', v.c, v.r); u.inVent = true; u.ventId = v.id; }
     this.players[2].credits = this.biomass;
@@ -149,8 +150,9 @@ export class Game {
       const c = host ? host.c : u.c, r = host ? host.r : u.r;
       const atPad = this.terr(c, r) === 'pad';
       const atFob = this.buildings.some((b) => b.owner === pid && b.type === 'fob' && !b.progress && distance(b.c, b.r, c, r) <= 1);
+      const atDepot = this.buildings.some((b) => b.owner === pid && b.type === 'depot' && distance(b.c, b.r, c, r) <= 1);
       const atShip = (host && host.type === 'schiff' && host.landed) || this.units.some((s) => s.owner === pid && s.type === 'schiff' && s.landed && s !== u && distance(s.c, s.r, c, r) <= 1);
-      if (atPad || atFob || atShip) {
+      if (atPad || atFob || atShip || atDepot) {
         if (u.ammo < d.ammo) { u.ammo = d.ammo; if (pid === 0) this.events.push({ type: 'float', c, r, text: 'Munition', color: '#9fd8ff' }); }
         if ((atPad || atFob) && d.flares) u.flares = d.flares;
       }
@@ -474,6 +476,7 @@ export class Game {
     const dmg = this.calcDamage(a, t);
     this.events.push({ type: 'attack', a: a.id, t: t.id, dmg });
     if ((ad.abil || []).includes('burn')) this.ignite(t.c, t.r, a.owner);
+    if (a.type === 'spucker' && !t.isBld) { this.acid[this.idx(t.c, t.r)] = Math.max(this.acid[this.idx(t.c, t.r)], this.round + 1); }
     this.hurt(t, dmg, a);
     if (this.alive(t) && !t.isBld && this.canCounter(t, a)) {
       const cd = Math.max(1, Math.round(this.calcDamage(t, a) * 0.75));
@@ -542,7 +545,8 @@ export class Game {
       if (t.type === 'schiff' && t.owner !== byOwner) st.ships++;
     }
     if (this.isXeno(t)) {
-      this.befall = Math.max(0, this.befall - (t.type === 'mutter' ? 15 : t.type === 'ei' ? 1 : 0.6));
+      this.befall = Math.max(0, this.befall - (t.type === 'mutter' ? 15 : t.type === 'knoten' ? 4 : t.type === 'ei' ? 1 : 0.6));
+      if (t.type === 'knoten') this.say(byOwner === 0 ? 'Nestknoten zerstört — der Befall sinkt.' : 'Ein Nestknoten wurde zerstört.', byOwner === 0 ? 'good' : 'info');
       if (t.type !== 'ei' && t.type !== 'klammerer') this.acidSplash(t, by);
       if (byOwner >= 0 && byOwner !== 2) this.players[byOwner].credits += t.type === 'mutter' ? 400 : BOUNTY.xeno;
       if (t.type === 'mutter') this.say('Die Mutter ist tot! Der Befall bricht ein.', 'good');
@@ -854,7 +858,7 @@ export class Game {
       if (this.unitAt(c, r) || this.bAt(c, r) || this.siteAt(c, r) || this.ventAt(c, r)) return false;
       if (TERRAIN[this.terr(c, r)].veh == null) return false;
       if (f === 'siedler') return this.buildings.some((b) => b.owner === u.owner && !b.progress && distance(b.c, b.r, c, r) <= 3) || this.sites.some((s) => s.owner === u.owner && distance(s.c, s.r, c, r) <= 2);
-      return this.buildings.some((b) => b.owner === u.owner && b.type === 'fob' && distance(b.c, b.r, c, r) <= 2);
+      return type === 'depot' || this.buildings.some((b) => b.owner === u.owner && b.type === 'fob' && distance(b.c, b.r, c, r) <= 2);
     });
   }
   build(u, type, c, r) {
@@ -1003,7 +1007,7 @@ export class Game {
     // Harz breitet sich aus
     this.spreadResin();
     const resinCount = this.resin.reduce((s, v) => s + v, 0);
-    this.biomass += (4 + Math.min(14, resinCount * 0.12)) * this.diff.brood;
+    this.biomass += (4 + Math.min(14, resinCount * 0.12) + this.units.filter((u) => u.type === 'knoten').length) * this.diff.brood;
     this.befall += 1.2;
     this.befall = Math.min(100, this.befall);
     // Schläfer-Synthetiker

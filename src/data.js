@@ -42,6 +42,7 @@ export const UNITS = {
   smartgun:   { fac: 'marines', name: 'Smartgunner', cls: 'inf', hp: 12, atk: 6, rng: [1, 3], mv: 3, sight: 3, tracker: 3, ammo: 5, armor: 0.1, cost: 360, vs: { xeno: 1.2 }, abil: ['watch'], desc: 'Zielgestütztes schweres MG. Feuert in der gegnerischen Runde auf alles, was in Reichweite zieht.' },
   pionier:    { fac: 'marines', name: 'Pionier', cls: 'inf', hp: 12, atk: 4, rng: [1, 1], mv: 4, sight: 3, tracker: 3, ammo: 5, cost: 240, abil: ['build', 'weld', 'repair', 'fob'], desc: 'Errichtet FOBs, Geschütze und Flutlichter, verschweißt Schächte.' },
   sani:       { fac: 'marines', name: 'Sanitäter', cls: 'inf', hp: 11, atk: 3, rng: [1, 2], mv: 4, sight: 3, tracker: 3, ammo: 4, cost: 200, abil: ['heal'], desc: 'Heilt Trupps daneben und stabilisiert Befallene (+1 Runde).' },
+  flammer:    { fac: 'marines', name: 'Flammentrupp', cls: 'inf', hp: 12, atk: 6, rng: [1, 1], mv: 4, sight: 3, tracker: 3, ammo: 4, cost: 260, vs: { xeno: 1.6, egg: 2 }, abil: ['burn'], desc: 'Marines mit Flammenwerfer. Brennt Harz, Eier und Nestknoten weg, Munition knapp.' },
   panzerwagen:{ fac: 'marines', name: 'Panzerwagen', cls: 'veh', hp: 34, atk: 6, rng: [1, 2], mv: 6, sight: 3, armor: 0.4, cap: 4, tracker: 6, ammo: 8, cost: 600, vs: { xeno: 1.1 }, desc: 'Sechsrädriger Schützenpanzer für 4 Trupps, mit Melder.' },
   schiff:     { fac: 'marines', name: 'Landungsschiff', cls: 'air', hp: 40, atk: 7, rng: [1, 2], mv: 10, sight: 4, armor: 0.35, cap: 6, tracker: 7, ammo: 6, cost: 1500, desc: 'Fliegt über alles. Nur gelandet nimmt es auf, setzt ab und dient als Nachschubpunkt — dann ist es verwundbar.' },
   // ---- Beide Seiten ----
@@ -50,6 +51,8 @@ export const UNITS = {
   ei:         { fac: 'brut', name: 'Ei', cls: 'egg', hp: 4, atk: 0, rng: [0, 0], mv: 0, sight: 2, desc: 'Öffnet sich, wenn Beute in die Nähe kommt.' },
   klammerer:  { fac: 'brut', name: 'Klammerer', cls: 'xeno', hp: 3, atk: 0, rng: [1, 1], mv: 5, sight: 3, vent: 3, desc: 'Springt Trupps an. Wer befallen ist, hat drei Runden.' },
   brutling:   { fac: 'brut', name: 'Brutling', cls: 'xeno', hp: 4, atk: 1, rng: [1, 1], mv: 4, sight: 2, vent: 3, desc: 'Frisch geschlüpft. Flieht in die Schächte und wächst heran.' },
+  spucker:    { fac: 'brut', name: 'Spucker', cls: 'xeno', hp: 9, atk: 4, rng: [1, 2], mv: 4, sight: 4, vent: 3, desc: 'Spuckt Säure über 2 Felder. Das getroffene Feld ätzt noch eine Runde.' },
+  knoten:     { fac: 'brut', name: 'Nestknoten', cls: 'egg', hp: 30, atk: 0, rng: [0, 0], mv: 0, sight: 3, armor: 0.2, desc: 'Pulsierender Brutstock. Hier kommt die Brut nach. Zerstört senkt er den Befall deutlich.' },
   laeufer:    { fac: 'brut', name: 'Läufer', cls: 'xeno', hp: 10, atk: 4, rng: [1, 1], mv: 6, sight: 3, vent: 3, desc: 'Schnell und vierbeinig. Kommt aus den Schächten.' },
   jaeger:     { fac: 'brut', name: 'Jäger', cls: 'xeno', hp: 15, atk: 6, rng: [1, 1], mv: 5, sight: 3, armor: 0.1, vent: 2, desc: 'Der klassische Krieger der Brut. Bricht verschweißte Schächte auf.' },
   brecher:    { fac: 'brut', name: 'Brecher', cls: 'xeno', hp: 32, atk: 9, rng: [1, 1], mv: 4, sight: 3, armor: 0.3, vent: 0, desc: 'Gepanzerter Wächter. Zu groß für die Schächte.' },
@@ -66,13 +69,15 @@ export const BUILDINGS = {
   sensor:     { fac: 'both', name: 'Sensormast', hp: 12, armor: 0.1, sight: 2, tracker: 8, cost: 160, build: 1, desc: 'Großer Bewegungsmelder, 8 Felder.' },
   schott:     { fac: 'both', name: 'Barrikade', hp: 26, armor: 0.35, sight: 1, cost: 60, build: 0, desc: 'Sperrt das Feld. Hält auch die Brut eine Weile auf.' },
   fob:        { fac: 'marines', name: 'FOB', hp: 40, armor: 0.3, sight: 4, tracker: 6, light: 2, cost: 450, build: 0, spawn: 3, desc: 'Vorgeschobene Basis: Nachschub landet hier, Munition wird aufgefüllt, Bauen im Umkreis von 2.' },
+  depot:      { fac: 'marines', name: 'Munitionsdepot', hp: 14, armor: 0.15, sight: 2, cost: 120, build: 0, ammoBox: true, desc: 'Munitionskisten: Trupps daneben füllen zu Rundenbeginn auf. Überall baubar, nicht nur am FOB.' },
+  wachturm:   { fac: 'siedler', name: 'Wachturm', hp: 22, armor: 0.3, sight: 6, light: 1, cost: 180, build: 1, desc: 'Erhöhter Ausguck mit Scheinwerfer: Sicht 6 Felder.' },
   sanizelt:   { fac: 'marines', name: 'Sanitätszelt', hp: 18, armor: 0.15, sight: 2, light: 1, cost: 200, build: 1, cure: true, desc: 'Trupps daneben werden geheilt und vom Befall befreit.' },
 };
 export const BUILD_LIST = {
-  siedler: ['wohnmodul', 'werkstatt', 'kranken', 'geschuetz', 'flutlicht', 'sensor', 'schott'],
-  marines: ['geschuetz', 'flutlicht', 'sanizelt', 'sensor', 'schott'],
+  siedler: ['wohnmodul', 'werkstatt', 'kranken', 'geschuetz', 'flutlicht', 'wachturm', 'sensor', 'schott'],
+  marines: ['geschuetz', 'flutlicht', 'sanizelt', 'depot', 'sensor', 'schott'],
 };
-export const MARINE_BUY = ['schuetze', 'unteroff', 'smartgun', 'pionier', 'sani', 'panzerwagen', 'synth', 'schiff'];
+export const MARINE_BUY = ['schuetze', 'unteroff', 'smartgun', 'flammer', 'pionier', 'sani', 'panzerwagen', 'synth', 'schiff'];
 
 export const SITES = {
   prozessor: { name: 'Atmosphäreprozessor', pts: 2, income: 40, desc: 'Herz des Terraformings. 2 Punkte je Runde, solange besetzt.' },
@@ -88,7 +93,7 @@ export const HOST_TIME = 3;          // Runden bis zum Ausbruch
 export const LIGHT_FLARE = { rad: 2, rounds: 2, range: 4 };
 
 // Biomasse-Kosten der Brut, Stufe ab der verfügbar
-export const BROOD = { laeufer: { b: 8, st: 1 }, jaeger: { b: 14, st: 2 }, brecher: { b: 30, st: 3 }, ei: { b: 5, st: 1 } };
+export const BROOD = { laeufer: { b: 8, st: 1 }, spucker: { b: 11, st: 2 }, jaeger: { b: 14, st: 2 }, brecher: { b: 30, st: 3 }, ei: { b: 5, st: 1 }, knoten: { b: 20, st: 2 } };
 export const STAGE_NAMES = ['', 'Erste Sichtungen', 'Ausbreitung', 'Brutstock', 'Die Mutter erwacht'];
 
 export const DIFFICULTY = {
